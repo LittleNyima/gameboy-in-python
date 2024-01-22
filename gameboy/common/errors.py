@@ -1,0 +1,2 @@
+class CheckFailedError(RuntimeError):
+    pass
