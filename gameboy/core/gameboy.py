@@ -25,3 +25,6 @@ class GameBoy(BaseDevice):
 
     def shutdown(self):
         self._montherboard.shutdown()
+
+    def step(self):
+        self._montherboard.step()

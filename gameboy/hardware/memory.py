@@ -3,13 +3,13 @@ from typing import Optional
 import numpy as np
 
 from gameboy.common.ioutils import load_u8_binary_file
-from gameboy.common.typings import U8, U16, Int, U8Array
-from gameboy.core import BaseDevice
+from gameboy.common.typings import U8, U16, U8Array
+from gameboy.core import IODevice
 
 EMPTY_MEMORY = np.empty((0,), dtype=U8)
 
 
-class MemoryLike(BaseDevice):
+class MemoryLike(IODevice):
 
     def __init__(self, file: Optional[str] = None):
         self._file = file
@@ -24,7 +24,7 @@ class MemoryLike(BaseDevice):
     def read(self, address: U16) -> U8:
         return self._memory[address]
 
-    def read_many(self, address: U16, size: Int) -> U8Array:
+    def read_many(self, address: U16, size: U16) -> U8Array:
         return self._memory[address:address + size]
 
     def read_range(self, lowerbound: U16, upperbound: U16) -> U8Array:

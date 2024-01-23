@@ -108,6 +108,9 @@ if __name__ == '__main__':
         author_email='littlenyima@163.com',
         url='https://github.com/LittleNyima/gameboy-in-python',
         packages=find_packages(),
+        package_data={
+            'gameboy.core': ['opcodes.json'],
+        },
         include_package_data=True,
         install_requires=parse_requirements(),
         classifiers=[

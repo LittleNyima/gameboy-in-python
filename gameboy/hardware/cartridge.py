@@ -1,7 +1,8 @@
+from functools import wraps
 from typing import Any, Callable, Optional
 
 from gameboy.common.loggings import get_logger
-from gameboy.common.typings import U8, U16, Int, U8Array
+from gameboy.common.typings import U8, U16, U8Array
 from gameboy.hardware.carts.constants import CartImplType
 from gameboy.hardware.carts.impl import impl_mapping
 from gameboy.hardware.memory import MemoryLike
@@ -11,6 +12,7 @@ logger = get_logger(file=__file__)
 
 def dispatch_impl(allow_fallback=False):
     def dispatcher(method: Callable):
+        @wraps(method)
         def wrapper(self: 'Cartridge', *args: Any, **kwargs: Any):
             name = method.__name__
             impl = impl_mapping.get(self.impl)
@@ -53,7 +55,7 @@ class Cartridge(MemoryLike):
         return super().read(address)
 
     @dispatch_impl(allow_fallback=True)
-    def read_many(self, address: U16, size: Int) -> U8Array:
+    def read_many(self, address: U16, size: U16) -> U8Array:
         return super().read_many(address, size)
 
     @dispatch_impl(allow_fallback=True)
