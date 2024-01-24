@@ -34,4 +34,4 @@ class Motherboard(BaseDevice):
         self._boot_rom.shutdown()
 
     def step(self):
-        self._cpu.step()
+        return self._cpu.step()

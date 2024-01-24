@@ -13,9 +13,15 @@ class LoggerFactory:
         formatter = logging.Formatter(log_format, date_format)
 
         self.log_level = logging.DEBUG
-        self.handler = logging.StreamHandler()
-        self.handler.setLevel(self.log_level)
-        self.handler.setFormatter(formatter)
+
+        self.stream_handler = logging.StreamHandler()
+        self.stream_handler.setLevel(self.log_level)
+        self.stream_handler.setFormatter(formatter)
+        self.file_handler = logging.FileHandler(
+            filename='gameboy.log', mode='w',
+        )
+        self.file_handler.setLevel(self.log_level)
+        self.file_handler.setFormatter(formatter)
 
     def get_logger(
         self,
@@ -26,7 +32,8 @@ class LoggerFactory:
         logger_name = name or file or ''
         logger = logging.getLogger(logger_name)
         logger.setLevel(self.log_level)
-        logger.addHandler(self.handler)
+        logger.addHandler(self.stream_handler)
+        logger.addHandler(self.file_handler)
 
         return logger
 

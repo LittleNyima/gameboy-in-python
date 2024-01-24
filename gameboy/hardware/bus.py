@@ -20,9 +20,12 @@ FFFF  FFFF  Interrupt Enable
             register (IE)
 '''
 
+from gameboy.common.loggings import get_logger
 from gameboy.common.typings import U8, U16
 from gameboy.core.device import IODevice
 from gameboy.hardware.memory import MemoryLike
+
+logger = get_logger(file=__file__)
 
 
 class Bus(IODevice):
@@ -33,6 +36,19 @@ class Bus(IODevice):
         self._bootrom_enabled = True
 
     def read(self, address: U16) -> U8:
+        if self._bootrom_enabled and 0x0 <= address <= 0xFF:
+            return self._boot_rom.read(address)
         if 0x0 <= address <= 0x7FFF:
             return self._cartridge.read(address)
-        raise NotImplementedError(f'Unable to read {address}')
+        raise NotImplementedError(f'Unable to read {address:04X}.')
+
+    def write(self, address: U16, value: U8):
+        logger.debug(f'Writting {value:02X} to {address:04X}.')
+        if 0x8000 <= address <= 0x9FFF:
+            logger.debug('Writting to VRAM')
+            # TODO: implement VRAM
+        elif 0xFF00 <= address <= 0xFF7F:
+            logger.debug('Writting to I/O ports')
+            # TODO: implement I/O
+        else:
+            raise NotImplementedError(f'Unable to write {address:04X}.')

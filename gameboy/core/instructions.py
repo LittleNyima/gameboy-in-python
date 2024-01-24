@@ -6,6 +6,43 @@ To re-generate this file, run:
 $ python tools/codegen/instructions.py --target gameboy/core/instructions.py
 To preview the generated contents, run:
 $ python tools/codegen/instructions.py --print
+
+Instruction Specifications
+==========================
+
+Instructions
+------------
+The format of the instruction is <mnemonic> [<operand>[, <operand>]]. In
+addtion to mnemonic and operand, an instruction should also have following
+attributes:
+
+bytes (int): Number of bytes in memory.
+cycles (List[int]): The timer cycle cost of execution of the instruction.
+    Each number in the list is corresponding to an execution branch.
+immediate (bool): Whether the result is written to register (or memory
+    otherwise).
+flags (FlagType): The behaviour of flag setting and resetting.
+
+Operands
+--------
+The operands are formally defined as: <operand> ::= [<opbody>] | <opbody>,
+<opbody> ::= <opname>[+][-]. The operand surrounded by square brackets
+indicates that it is not an immediate operand. The operand followed with
+a plus or minus symbol indicates that value of the register should be
+incremented or decremented after execution, respectively.
+
+The <opname> can be divided into following classes:
+8-bit register name: A, B, C, D, E, H, L.
+16-bit register name: AF, BC, DE, HL, SP.
+Addressing register name: BC_MEM, C_MEM, DE_MEM, HL_MEM.
+Immediate numbers: A16 (little-endian 16-bit address), E8 (signed 8-bit
+    number), N16 (unsigned 16-bit number), N8 (unsigned 8-bit number).
+Addressing immediate numbers: A16_MEM, A8_MEM.
+Increments and decrements: HL_MEM_DEC, HL_MEM_INC, SP_INC.
+Bit indicators: BIT0, BIT1, BIT2, BIT3, BIT4, BIT5, BIT6, BIT7.
+Literals: HEX00, HEX08, HEX10, HEX18, HEX20, HEX28, HEX30, HEX38.
+Flags: Z. (It's unclear whether C and H are flag names or register names.)
+Conditions: NC, NZ. (It's unclear whether C and Z are condition names.)
 '''
 
 import json
