@@ -3,11 +3,24 @@ from gameboy.common.typings import U8, U16, U8Array
 
 class BaseDevice:
 
+    def __init__(self):
+        self._started = False
+
     def startup(self):
-        pass
+        if not self._started:
+            self._started = True
+            for obj in self.__dict__.values():
+                if isinstance(obj, BaseDevice) and not obj._started:
+                    obj.startup()
+                    obj._started = True
 
     def shutdown(self):
-        pass
+        if self._started:
+            self._started = False
+            for obj in self.__dict__.values():
+                if isinstance(obj, BaseDevice) and obj._started:
+                    obj.shutdown()
+                    obj._started = False
 
 
 class IODevice(BaseDevice):

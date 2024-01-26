@@ -12,6 +12,7 @@ EMPTY_MEMORY = np.empty((0,), dtype=U8)
 class MemoryLike(IODevice):
 
     def __init__(self, file: Optional[str] = None):
+        super().__init__()
         self._file = file
         self._memory = EMPTY_MEMORY
 

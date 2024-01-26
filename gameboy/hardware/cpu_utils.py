@@ -20,8 +20,10 @@ def log_instr(cpu: 'CPU', instr: Instruction):
     logger.debug(f'Bytes - {instr.bytes}')
     logger.debug(f'Cycles - {instr.cycles}')
     logger.debug(f'Immediate - {instr.immediate}')
-    logger.debug(f'Flags - {instr.flag_z.value}{instr.flag_n.value}'
-                 f'{instr.flag_h.value}{instr.flag_c.value}')
+    logger.debug(
+        f'Flags - {instr.flag_z.value}{instr.flag_n.value}'
+        f'{instr.flag_h.value}{instr.flag_c.value}',
+    )
 
 
 def log_cpu_status(cpu: 'CPU', when: str):
@@ -50,6 +52,10 @@ def set_hi(value: U16, hi: U8) -> U16:
 def set_lo(value: U16, lo: U8) -> U16:
     hi = value & 0xFF00
     return U16(hi | U16(lo))
+
+
+def concat_bytes(hi: U8, lo: U8) -> U16:
+    return U16((U16(hi) << 8) | U16(lo))
 
 
 def handle_inc_dec(operand_type: OperandType, cpu: 'CPU'):
@@ -91,11 +97,11 @@ def read_value_u8(operand_type: OperandType, cpu: 'CPU') -> U8:
     if operand.name.upper() in REG_8BIT_NAMES and operand.immediate:  # reg
         attr_name = f'reg_{operand.name.lower()}'
         r = getattr(cpu, attr_name)
-    if operand.name.upper() in REG_NAMES and not operand.immediate:  # [reg]
+    elif operand.name.upper() in REG_NAMES and not operand.immediate:  # [reg]
         attr_name = f'reg_{operand.name.lower()}'
         reg_value = getattr(cpu, attr_name)
         r = cpu.read_u8(reg_value)
-    if operand_type == OperandType.N8:  # immediate
+    elif operand_type == OperandType.N8:  # immediate
         r = cpu.read_u8(cpu.reg_pc + U16(1))
     handle_inc_dec(operand_type=operand_type, cpu=cpu)
     if r is not None:
@@ -114,6 +120,10 @@ def write_value_u8(operand_type: OperandType, cpu: 'CPU', value: U8):
         reg_value = getattr(cpu, attr_name)
         cpu.write(reg_value, value)
         return handle_inc_dec(operand_type=operand_type, cpu=cpu)
+    if operand_type == OperandType.A16_MEM:
+        u16 = cpu.read_u16(cpu.reg_pc + U16(1))
+        cpu.write(u16, value)
+        return handle_inc_dec(operand_type=operand_type, cpu=cpu)
     raise UnexpectedFallThroughError
 
 
@@ -123,7 +133,7 @@ def read_value_u16(operand_type: OperandType, cpu: 'CPU') -> U16:
     if operand.name.upper() in REG_16BIT_NAMES and operand.immediate:  # reg
         attr_name = f'reg_{operand.name.lower()}'
         r = getattr(cpu, attr_name)
-    if operand_type in (OperandType.A16, OperandType.N16):  # immediate
+    elif operand_type in (OperandType.A16, OperandType.N16):  # immediate
         r = cpu.read_u16(cpu.reg_pc + U16(1))
     handle_inc_dec(operand_type=operand_type, cpu=cpu)
     if r is not None:
@@ -136,8 +146,30 @@ def write_value_u16(operand_type: OperandType, cpu: 'CPU', value: U16):
     if operand.name.upper() in REG_16BIT_NAMES and operand.immediate:  # reg
         attr_name = f'reg_{operand.name.lower()}'
         setattr(cpu, attr_name, value)
-        return handle_inc_dec(operand_type, cpu)
+        return handle_inc_dec(operand_type=operand_type, cpu=cpu)
     raise UnexpectedFallThroughError
+
+
+def pop_stack_u8(cpu: 'CPU') -> U8:
+    r = cpu.read_u8(cpu.reg_sp)
+    cpu.reg_sp += U16(1)
+    return r
+
+
+def push_stack_u8(cpu: 'CPU', value: U8):
+    cpu.reg_sp -= U16(1)
+    cpu.write(cpu.reg_sp, value)
+
+
+def pop_stack_u16(cpu: 'CPU') -> U16:
+    lo = pop_stack_u8(cpu=cpu)
+    hi = pop_stack_u8(cpu=cpu)
+    return concat_bytes(hi=hi, lo=lo)
+
+
+def push_stack_u16(cpu: 'CPU', value: U16):
+    push_stack_u8(cpu=cpu, value=get_hi(value))
+    push_stack_u8(cpu=cpu, value=get_lo(value))
 
 
 def check_condition(operand_type: OperandType, cpu: 'CPU') -> bool:

@@ -4,7 +4,10 @@ from gameboy.core.device import BaseDevice
 from gameboy.core.instructions import decode_opcode
 from gameboy.hardware.bus import Bus
 from gameboy.hardware.cpu_exec import execute
-from gameboy.hardware.cpu_utils import get_hi, get_lo, set_hi, set_lo
+from gameboy.hardware.cpu_utils import (
+    concat_bytes, get_hi, get_lo, set_hi, set_lo,
+)
+from gameboy.hardware.register import Register
 
 logger = get_logger(file=__file__)
 
@@ -12,30 +15,30 @@ logger = get_logger(file=__file__)
 class CPU(BaseDevice):
 
     def __init__(self, bus: Bus):
+        super().__init__()
         # registers
-        self._reg_af = U16(0x0)
-        self._reg_bc = U16(0x0)
-        self._reg_de = U16(0x0)
-        self._reg_hl = U16(0x0)
-        self._reg_sp = U16(0x0)
-        self._reg_pc = U16(0x0)
+        self._reg_af = Register()
+        self._reg_bc = Register()
+        self._reg_de = Register()
+        self._reg_hl = Register()
+        self._reg_sp = Register()
+        self._reg_pc = Register()
 
         self._bus = bus
 
-    def fetch_and_execute(self):
+    def fetch_and_execute(self) -> int:
         opcode = self.read_u8(self.reg_pc)
         if opcode == 0xCB:
             opcode = self.read_u8(self.reg_pc)
             instr = decode_opcode(opcode, True)
         else:
             instr = decode_opcode(opcode, False)
-        logger.debug(f'Read {instr} ({opcode:08b}) at 0x{self.reg_pc:04X}')
+        logger.info(f'Execute {instr} ({opcode:08b}) at 0x{self.reg_pc:04X}')
 
-        execute(self, instr)
+        return execute(self, instr)
 
-    def step(self):
-        self.fetch_and_execute()
-        return True
+    def step(self) -> int:
+        return self.fetch_and_execute()
 
     def read_u8(self, address: U16) -> U8:
         return self._bus.read(address)
@@ -43,7 +46,7 @@ class CPU(BaseDevice):
     def read_u16(self, address: U16) -> U16:
         lo = self.read_u8(address)
         hi = self.read_u8(address + U16(1))
-        return U16((hi << 8) | lo)
+        return concat_bytes(hi=hi, lo=lo)
 
     def read_i8(self, address: U16) -> I8:
         return I8(self.read_u8(address=address))
@@ -53,51 +56,51 @@ class CPU(BaseDevice):
 
     @property
     def reg_af(self) -> U16:
-        return self._reg_af
+        return self._reg_af.value
 
     @reg_af.setter
     def reg_af(self, value: U16):
-        self._reg_af = U16(value)
+        self._reg_af.value = U16(value)
 
     @property
     def reg_bc(self) -> U16:
-        return self._reg_bc
+        return self._reg_bc.value
 
     @reg_bc.setter
     def reg_bc(self, value: U16):
-        self._reg_bc = U16(value)
+        self._reg_bc.value = U16(value)
 
     @property
     def reg_de(self) -> U16:
-        return self._reg_de
+        return self._reg_de.value
 
     @reg_de.setter
     def reg_de(self, value: U16):
-        self._reg_de = U16(value)
+        self._reg_de.value = U16(value)
 
     @property
     def reg_hl(self) -> U16:
-        return self._reg_hl
+        return self._reg_hl.value
 
     @reg_hl.setter
     def reg_hl(self, value: U16):
-        self._reg_hl = U16(value)
+        self._reg_hl.value = U16(value)
 
     @property
     def reg_sp(self) -> U16:
-        return self._reg_sp
+        return self._reg_sp.value
 
     @reg_sp.setter
     def reg_sp(self, value: U16):
-        self._reg_sp = U16(value)
+        self._reg_sp.value = U16(value)
 
     @property
     def reg_pc(self) -> U16:
-        return self._reg_pc
+        return self._reg_pc.value
 
     @reg_pc.setter
     def reg_pc(self, value: U16):
-        self._reg_pc = U16(value)
+        self._reg_pc.value = U16(value)
 
     @property
     def reg_a(self) -> U8:
