@@ -24,6 +24,13 @@ def log_instr(cpu: 'CPU', instr: Instruction):
         f'Flags - {instr.flag_z.value}{instr.flag_n.value}'
         f'{instr.flag_h.value}{instr.flag_c.value}',
     )
+    if instr.bytes == 2:
+        logger.debug(
+            f'u8 - {cpu.read_u8(cpu.reg_pc + U16(1)):04X}  '
+            f'i8 - {cpu.read_i8(cpu.reg_pc + U16(1)):04X}',
+        )
+    if instr.bytes == 3:
+        logger.debug(f'u16 - {cpu.read_u16(cpu.reg_pc + U16(1)):04X}')
 
 
 def log_cpu_status(cpu: 'CPU', when: str):

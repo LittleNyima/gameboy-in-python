@@ -13,6 +13,29 @@ if TYPE_CHECKING:
     from gameboy.hardware.cpu import CPU
 
 
+def execute_add(cpu: 'CPU', instr: Instruction) -> int:  # ADD
+    # ADD A r8; ADD A [HL]; ADD A n8;  ZNHC Z0HC
+    # ADD HL r16; ADD HL SP;  ZNHC -0HC
+    # ADD SP e8;  ZNHC 00HC
+    if instr.operand0 == OperandType.SP:
+        raise NotImplementedError
+    # ADD A r8; ADD A [HL]; ADD A n8;
+    if is_value_u8(instr.operand0) and is_value_u8(instr.operand1):
+        v0 = read_value_u8(instr.operand0, cpu)
+        v1 = read_value_u8(instr.operand1, cpu)
+        res = U8(v0 + v1)
+        write_value_u8(instr.operand0, cpu, res)
+        _ = cpu.set_flag_z() if res == 0 else cpu.reset_flag_z()
+        cpu.reset_flag_n()
+        half_carry = (0xF & v0) + (0xF & v1) > 0xF
+        _ = cpu.set_flag_h() if half_carry else cpu.reset_flag_h()
+        carry = int(v0) + int(v1) > 0xFF
+        _ = cpu.set_flag_c() if carry else cpu.reset_flag_c()
+        cpu.reg_pc += instr.bytes
+        return instr.cycles[0]
+    raise UnexpectedFallThroughError
+
+
 def execute_call(cpu: 'CPU', instr: Instruction) -> int:  # CALL
     # CALL n16; CALL cc n16;  ZNHC ----
     a16 = cpu.read_u16(cpu.reg_pc + U16(1))
@@ -33,12 +56,10 @@ def execute_cp(cpu: 'CPU', instr: Instruction) -> int:  # CP
     # CP A r8; CP A [HL]; CP A n8;  ZNHC Z1HC
     va = cpu.reg_a
     u8 = read_value_u8(instr.operand1, cpu)
-    if va == u8:
-        cpu.set_flag_z()
-    if (va & 0xF) < (u8 & 0xF):
-        cpu.set_flag_h()
-    if va < u8:
-        cpu.set_flag_c()
+    _ = cpu.set_flag_z() if va == u8 else cpu.reset_flag_z()
+    cpu.set_flag_n()
+    _ = cpu.set_flag_h() if (va & 0xF) < (u8 & 0xF) else cpu.reset_flag_h()
+    _ = cpu.set_flag_c() if va < u8 else cpu.reset_flag_c()
     cpu.reg_pc += instr.bytes
     return instr.cycles[0]
 
@@ -51,11 +72,11 @@ def execute_dec(cpu: 'CPU', instr: Instruction) -> int:  # DEC
         res = u8 - U8(1)
         write_value_u8(instr.operand0, cpu, res)
 
-        if res == U8(0):  # set zero flag if result is 0
-            cpu.set_flag_z()
+        # set zero flag if result is 0
+        _ = cpu.set_flag_z() if res == 0 else cpu.reset_flag_z()
         cpu.set_flag_n()  # set substract flag
-        if u8 & 0xF < 1:  # set half carry if borrows from bit 4
-            cpu.set_flag_h()
+        half_carry = u8 & 0xF < 1  # set half carry if borrows from bit 4
+        _ = cpu.set_flag_h() if half_carry else cpu.reset_flag_h()
 
         cpu.reg_pc += instr.bytes
         return instr.cycles[0]
@@ -84,11 +105,12 @@ def execute_inc(cpu: 'CPU', instr: Instruction) -> int:  # INC
         res = u8 + U8(1)
         write_value_u8(instr.operand0, cpu, res)
 
-        if res == 0:  # set zero flag if result is 0
-            cpu.set_flag_z()
+        # set zero flag if result is 0
+        _ = cpu.set_flag_z() if res == 0 else cpu.reset_flag_z()
         cpu.reset_flag_n()  # reset substract flag
-        if (u8 & 0xF) + 1 > 0xF:  # set half carry flag if bit 3 overflows
-            cpu.set_flag_h()
+        # set half carry flag if bit 3 overflows
+        half_carry = (u8 & 0xF) + 1 > 0xF
+        _ = cpu.set_flag_h() if half_carry else cpu.reset_flag_h()
 
         cpu.reg_pc += instr.bytes
         return instr.cycles[0]
@@ -132,6 +154,10 @@ def execute_ld(cpu: 'CPU', instr: Instruction) -> int:  # LD
     # Stack Pointer: LD SP n16; LD [n16] SP; LD HL SP+e8; LD SP HL
     # All instructions have no effect on flags except LD HL SP+e8: 00HC
     operand0, operand1 = instr.operand0, instr.operand1
+    # Out of no reason, LDH [C] A calls this handler too, handle this
+    # instruction with execute_ldh
+    if operand0 == OperandType.C_MEM and operand1 == OperandType.A:
+        return execute_ldh(cpu=cpu, instr=instr)
     if operand0 == OperandType.A16_MEM and operand1 == OperandType.SP:
         raise NotImplementedError  # LD [n16] SP
     if operand0 == OperandType.HL and operand1 == OperandType.SP_INC:
@@ -162,6 +188,10 @@ def execute_ldh(cpu: 'CPU', instr: Instruction) -> int:  # LDH
     if instr.operand0 == OperandType.A8_MEM:  # LDH [a8] A
         a8 = cpu.read_u8(cpu.reg_pc + U16(1))
         cpu.write(U16(a8) + U16(0xFF00), cpu.reg_a)
+        cpu.reg_pc += instr.bytes
+        return instr.cycles[0]
+    if instr.operand0 == OperandType.C_MEM:  # LDH [C] A
+        cpu.write(U16(cpu.reg_c) + U16(0xFF00), cpu.reg_a)
         cpu.reg_pc += instr.bytes
         return instr.cycles[0]
     raise UnexpectedFallThroughError
@@ -237,8 +267,7 @@ def execute_xor(cpu: 'CPU', instr: Instruction) -> int:  # XOR
     # XOR A r8; XOR A [HL]; XOR A n8;  ZNHC Z000
     u8 = read_value_u8(instr.operand1, cpu)
     res = cpu.reg_a ^ u8
-    if res == 0x0:
-        cpu.set_flag_z()
+    _ = cpu.set_flag_z() if res == 0 else cpu.reset_flag_z()
     cpu.reset_flag_n()
     cpu.reset_flag_h()
     cpu.reset_flag_c()
@@ -250,18 +279,17 @@ def execute_sub(cpu: 'CPU', instr: Instruction) -> int:  # SUB
     # SUB A r8; SUB A [HL]; SUB A n8;  ZNHC Z1HC
     u8 = read_value_u8(instr.operand1, cpu)
     res = cpu.reg_a - u8
-    if res == 0x0:
-        cpu.set_flag_z()
+    _ = cpu.set_flag_z() if res == 0x0 else cpu.reset_flag_z()
     cpu.set_flag_n()
-    if (cpu.reg_a & 0xF) < (u8 & 0xF):
-        cpu.set_flag_h()
-    if cpu.reg_a < u8:
-        cpu.set_flag_c()
+    half_carry = (cpu.reg_a & 0xF) < (u8 & 0xF)
+    _ = cpu.set_flag_h() if half_carry else cpu.reset_flag_h()
+    _ = cpu.set_flag_c() if cpu.reg_a < u8 else cpu.reset_flag_c()
     cpu.reg_pc += instr.bytes
     return instr.cycles[0]
 
 
 executor_mapping = {
+    InstrType.ADD: execute_add,
     InstrType.CALL: execute_call,
     InstrType.CP: execute_cp,
     InstrType.DEC: execute_dec,

@@ -9,9 +9,11 @@ class LoggerFactory:
 
     def __init__(self):
         log_format = '%(asctime)s - %(name)s - [%(levelname)s] %(message)s'
+        # log_format = '%(name)s - [%(levelname)s] %(message)s'
         date_format = '%Y-%m-%d %H:%M:%S'
         formatter = logging.Formatter(log_format, date_format)
 
+        self.log_level = logging.WARNING
         self.stream_handler = logging.StreamHandler()
         self.stream_handler.setLevel(logging.DEBUG)
         self.stream_handler.setFormatter(formatter)
@@ -29,7 +31,7 @@ class LoggerFactory:
         file = os.path.relpath(file, pkg_path) if file is not None else None
         logger_name = name or file or ''
         logger = logging.getLogger(logger_name)
-        logger.setLevel(logging.DEBUG)
+        logger.setLevel(self.log_level)
         logger.addHandler(self.stream_handler)
         logger.addHandler(self.file_handler)
 
@@ -40,7 +42,7 @@ logger_factory = LoggerFactory()
 
 
 def get_logger(
-        name: Optional[str] = None, file: Optional[str] = None,
+    name: Optional[str] = None, file: Optional[str] = None,
 ) -> logging.Logger:
     return logger_factory.get_logger(name=name, file=file)
 

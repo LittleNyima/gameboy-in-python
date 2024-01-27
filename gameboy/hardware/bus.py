@@ -24,6 +24,8 @@ from gameboy.common.errors import UnexpectedFallThroughError
 from gameboy.common.loggings import get_logger
 from gameboy.common.typings import U8, U16
 from gameboy.core.device import IODevice
+from gameboy.hardware.dma import DMA
+from gameboy.hardware.lcd import LCD
 from gameboy.hardware.memory import MemoryLike
 from gameboy.hardware.register import InterruptRegister
 
@@ -41,6 +43,8 @@ class Bus(IODevice):
         hram: MemoryLike,
         oam: MemoryLike,
         int_reg: InterruptRegister,
+        dma: DMA,
+        lcd: LCD,
     ):
         super().__init__()
         self._boot_rom = boot_rom
@@ -50,6 +54,8 @@ class Bus(IODevice):
         self._hram = hram
         self._oam = oam
         self._int_reg = int_reg
+        self._dma = dma
+        self._lcd = lcd
         self._bootrom_mapped = True
 
     def read(self, address: U16) -> U8:
@@ -70,8 +76,7 @@ class Bus(IODevice):
         elif 0xFEA0 <= address <= 0xFEFF:
             raise NotImplementedError(f'Memory {address:04X} is unusable.')
         elif 0xFF00 <= address <= 0xFF7F:  # I/O Registers
-            # TODO: implement I/O registers
-            return U8()
+            return self.read_io_ports(address)
         elif 0xFF80 <= address <= 0xFFFE:  # High RAM
             return self._hram.read(address)
         elif address == 0xFFFF:  # Interrupt Enable Register
@@ -95,11 +100,28 @@ class Bus(IODevice):
         elif 0xFEA0 <= address <= 0xFEFF:
             raise NotImplementedError(f'Memory {address:04X} is unusable.')
         elif 0xFF00 <= address <= 0xFF7F:  # I/O Registers
-            # TODO: implement I/O registers
-            return
+            return self.write_io_ports(address, value)
         elif 0xFF80 <= address <= 0xFFFE:  # High RAM
             return self._hram.write(address, value)
         elif address == 0xFFFF:  # Interrupt Enable Register
             self._int_reg.int_enable = value
             return
         raise UnexpectedFallThroughError(f'Unable to write {address:04X}.')
+
+    def read_io_ports(self, address: U16) -> U8:
+        if 0xFF40 <= address <= 0xFF45:
+            return self._lcd.read(address)
+        elif 0xFF47 <= address <= 0xFF4B:
+            return self._lcd.read(address)
+        raise UnexpectedFallThroughError(f'Unable to read io {address:04X}.')
+
+    def write_io_ports(self, address: U16, value: U8):
+        if 0xFF10 <= address <= 0xFF3F:  # Sound related
+            return  # TODO: Implement sound
+        elif 0xFF40 <= address <= 0xFF45:
+            return self._lcd.write(address, value)
+        elif address == 0xFF46:  # OAM DMA source address & start
+            return self._dma.write(value)
+        elif 0xFF47 <= address <= 0xFF4B:  # BG palette data
+            return self._lcd.write(address, value)
+        raise UnexpectedFallThroughError(f'Unable to write io {address:04X}.')
