@@ -1,6 +1,6 @@
 import time
 
-from gameboy.hardware import Motherboard
+from .hardware import Motherboard
 
 
 class GameBoy:
