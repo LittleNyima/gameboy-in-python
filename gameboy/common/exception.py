@@ -1,0 +1,2 @@
+class UnexpectedFallThrough(NotImplementedError):
+    pass

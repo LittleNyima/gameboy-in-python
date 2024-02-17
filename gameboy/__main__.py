@@ -3,7 +3,7 @@ import argparse
 from gameboy import GameBoy
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog='gameboy',
         description='GameBoy Emulator in Python.',

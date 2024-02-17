@@ -36,11 +36,11 @@ class LoggerFactory:
 
         return logger
 
-    def set_level(self, level: int):
+    def set_level(self, level: int) -> None:
         self.file_handler.setLevel(level=level)
         self.stream_handler.setLevel(level=level)
 
-    def set_display_time(self, enable: bool):
+    def set_display_time(self, enable: bool) -> None:
         formatter = self.get_formatter(display_time=enable)
         self.file_handler.setFormatter(formatter)
         self.stream_handler.setFormatter(formatter)
@@ -49,13 +49,13 @@ class LoggerFactory:
 logger_factory = LoggerFactory()
 
 
-def get_logger(file: str):
+def get_logger(file: str) -> logging.Logger:
     return logger_factory.get_logger(file=file)
 
 
-def set_level(level: int):
+def set_level(level: int) -> None:
     logger_factory.set_level(level=level)
 
 
-def set_display_time(enable: bool):
+def set_display_time(enable: bool) -> None:
     logger_factory.set_display_time(enable=enable)

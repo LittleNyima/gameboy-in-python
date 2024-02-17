@@ -1,6 +1,6 @@
 import time
 
-from .hardware import Motherboard
+from gameboy.hardware import Motherboard
 
 
 class GameBoy:
@@ -14,7 +14,7 @@ class GameBoy:
             gamerom=gamerom,
         )
 
-    def tick(self):
+    def tick(self) -> bool:
         if self.paused:
             time.sleep(1 / 60)
             return True
