@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
 from gameboy.common import (
-    get_bit, get_hi, get_lo, get_logger, set_bit, set_hi, set_lo,
+    concat, get_bit, get_hi, get_lo, get_logger, set_bit, set_hi, set_lo,
 )
 from gameboy.hardware.cpu.execute import execute
 from gameboy.hardware.cpu.util import fetch_info, fetch_instruction
@@ -50,8 +50,17 @@ class CPU:
     def read(self, address: int) -> int:
         return self.bus.read(address=address)
 
+    def read16(self, address: int) -> int:
+        lo = self.read(address=address)
+        hi = self.read(address=address + 1)
+        return concat(hi=hi, lo=lo)
+
     def write(self, address: int, value: int) -> None:
         return self.bus.write(address=address, value=value)
+
+    def write16(self, address: int, value: int) -> None:
+        self.write(address=address, value=(value >> 8) & 0xFF)
+        self.write(address=address + 1, value=value & 0xFF)
 
     @property
     def reg_a(self):

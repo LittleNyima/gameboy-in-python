@@ -26,9 +26,9 @@ class Bus:
     def read(self, address: int) -> int:
         if 0x0 <= address <= 0x7FFF:
             return self.cartridge.read(address=address)
-        raise UnexpectedFallThrough(f'{address}')
+        raise UnexpectedFallThrough(f'{address:04X}')
 
     def write(self, address: int, value: int) -> None:
         if 0x0 <= address <= 0x7FFF:
             return self.cartridge.write(address=address, value=value)
-        raise UnexpectedFallThrough(f'{address}: {value}')
+        raise UnexpectedFallThrough(f'{address:04X}: {value}')

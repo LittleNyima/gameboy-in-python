@@ -41,7 +41,7 @@ class Cartridge:
 
     @property
     def title(self):
-        return bytes(self.data[0x134:0x144]).decode()
+        return bytes(self.data[0x134:0x144]).split(b'\x00')[0].decode()
 
     @property
     def sgb_flag(self):
