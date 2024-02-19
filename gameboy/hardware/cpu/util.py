@@ -105,7 +105,7 @@ def write_register(reg_type: RegType, value: int, cpu: 'CPU') -> None:
         cpu.reg_pc = value
     elif reg_type == RegType.SP:
         cpu.reg_sp = value
-    else:
+    elif reg_type != RegType.NONE:
         raise UnexpectedFallThrough(f'{reg_type}')
 
 
@@ -219,7 +219,21 @@ def fetch_info(instr: Instruction, cpu: 'CPU') -> ExecuteInfo:
     raise UnexpectedFallThrough
 
 
-def fetch_instruction(cpu: 'CPU'):
+def jump(
+    address: int,
+    condition: ConditionType,
+    save_context: bool,
+    cpu: 'CPU',
+) -> None:
+    if check_condition(cond_type=condition, cpu=cpu):
+        if save_context:
+            cpu.emulate(2)
+            cpu.push16(cpu.reg_pc)
+        cpu.reg_pc = address
+        cpu.emulate(1)
+
+
+def fetch_instruction(cpu: 'CPU') -> Instruction:
     opcode = cpu.read(cpu.reg_pc)
     cpu.reg_pc += 1
     return decode_instruction(opcode=opcode)

@@ -28,6 +28,7 @@ class CPU:
 
         self.halted: bool = False
         self.int_master_enabled: bool = False
+        self.int_enable_register: int = 0
 
     def tick(self):
         if not self.halted:
@@ -36,10 +37,12 @@ class CPU:
             lo = self.read(self.reg_pc + 1)
             hi = self.read(self.reg_pc + 2)
             instr = fetch_instruction(cpu=self)
+            self.emulate(1)
             logger.debug(
                 f'{pc:04X}: {str(instr):4s} '
-                f'({opcode:02X}, {lo:02X}, {hi:02X}) '
-                f'{self.reg_a:02X} {self.reg_b:02X} {self.reg_c:02X}',
+                f'({opcode=:02X}, {lo=:02X}, {hi=:02X}) '
+                f'A: {self.reg_a:02X} BC: {self.reg_bc:04X} '
+                f'DE: {self.reg_de:04X} HL: {self.reg_hl:04X}',
             )
             info = fetch_info(instr=instr, cpu=self)
             execute(instr=instr, info=info, cpu=self)
@@ -59,8 +62,26 @@ class CPU:
         return self.bus.write(address=address, value=value)
 
     def write16(self, address: int, value: int) -> None:
-        self.write(address=address, value=(value >> 8) & 0xFF)
-        self.write(address=address + 1, value=value & 0xFF)
+        self.write(address=address, value=get_hi(value))
+        self.write(address=address + 1, value=get_lo(value))
+
+    def pop(self) -> int:
+        value = self.read(self.reg_sp)
+        self.reg_sp += 1
+        return value
+
+    def pop16(self) -> int:
+        lo = self.pop()
+        hi = self.pop()
+        return concat(hi=hi, lo=lo)
+
+    def push(self, value: int) -> None:
+        self.reg_sp -= 1
+        self.write(address=self.reg_sp, value=value)
+
+    def push16(self, value: int) -> None:
+        self.push(get_hi(value))
+        self.push(get_lo(value))
 
     @property
     def reg_a(self):
