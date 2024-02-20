@@ -12,8 +12,11 @@ class Motherboard:
         self.bus = Bus(motherboard=self)
         self.cpu = CPU(motherboard=self)
 
+        self.ticks = 0
+
     def tick(self):
         self.cpu.tick()
+        self.ticks += 1
 
     def emulate(self, cycles: int):
         pass

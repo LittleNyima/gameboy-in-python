@@ -109,6 +109,18 @@ def write_register(reg_type: RegType, value: int, cpu: 'CPU') -> None:
         raise UnexpectedFallThrough(f'{reg_type}')
 
 
+def read_register_cb(reg_type: RegType, cpu: 'CPU') -> int:
+    if reg_type == RegType.HL:
+        return cpu.read(cpu.reg_hl)
+    return read_register(reg_type=reg_type, cpu=cpu)
+
+
+def write_register_cb(reg_type: RegType, value: int, cpu: 'CPU') -> None:
+    if reg_type == RegType.HL:
+        return cpu.write(address=cpu.reg_hl, value=value)
+    return write_register(reg_type=reg_type, value=value, cpu=cpu)
+
+
 def fetch_info(instr: Instruction, cpu: 'CPU') -> ExecuteInfo:
     if instr.addr_mode == AddrMode.IMP:
         return ExecuteInfo()
