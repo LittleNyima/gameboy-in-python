@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Optional
 
-from gameboy.common import UnexpectedFallThrough, concat, get_hi, get_lo
+from gameboy.common import concat, get_hi, get_lo
 from gameboy.core import (
     REG_16BIT, REG_LOOKUP, AddrMode, ConditionType, InstrType, Instruction,
     RegType,
@@ -65,7 +65,7 @@ def exec_cb(instr: Instruction, info: ExecuteInfo, cpu: 'CPU'):
     cycles = 3 if reg_type == RegType.HL else 1
     cpu.emulate(cycles=cycles)
     if op_type == 0x1:  # BIT
-        z_flag = reg_val & (1 << bit) == 0
+        z_flag = (reg_val & (1 << bit)) == 0
         set_flags(z_flag, False, True, None, cpu=cpu)
     elif op_type == 0x2:  # RES
         reg_val &= ~(1 << bit)
@@ -103,14 +103,13 @@ def exec_cb(instr: Instruction, info: ExecuteInfo, cpu: 'CPU'):
             write_register_cb(reg_type=reg_type, value=reg_val, cpu=cpu)
             set_flags(reg_val == 0, False, False, bool(lsb), cpu=cpu)
         elif op_type == 0x6:  # SWAP
-            reg_val = concat(hi=get_lo(reg_val), lo=get_hi(reg_val))
+            reg_val = ((reg_val & 0xF0) >> 4) | ((reg_val & 0x0F) << 4)
             write_register_cb(reg_type=reg_type, value=reg_val, cpu=cpu)
             set_flags(reg_val == 0, False, False, False, cpu=cpu)
         elif op_type == 0x7:  # SRL
             reg_val >>= 1
             write_register_cb(reg_type=reg_type, value=reg_val, cpu=cpu)
             set_flags(reg_val == 0, False, False, bool(lsb), cpu=cpu)
-    raise UnexpectedFallThrough
 
 
 def exec_ccf(instr: Instruction, info: ExecuteInfo, cpu: 'CPU'):
@@ -154,17 +153,17 @@ def exec_daa(instr: Instruction, info: ExecuteInfo, cpu: 'CPU'):
 
 
 def exec_dec(instr: Instruction, info: ExecuteInfo, cpu: 'CPU'):
-    value = read_register(reg_type=instr.reg_1, cpu=cpu) - 1
+    value = (read_register(reg_type=instr.reg_1, cpu=cpu) - 1) & 0xFFFF
     if instr.reg_1 in REG_16BIT:
         cpu.emulate(1)
     if instr.reg_1 == RegType.HL and instr.addr_mode == AddrMode.MR:
-        value = cpu.read(cpu.reg_hl) - 1
+        value = (cpu.read(cpu.reg_hl) - 1) & 0xFF
         cpu.write(cpu.reg_hl, value)
     else:
         write_register(reg_type=instr.reg_1, value=value, cpu=cpu)
         value = read_register(reg_type=instr.reg_1, cpu=cpu)
     if instr.opcode & 0xB != 0xB:  # Not DEC BC/DE/HL/SP
-        set_flags(value == 0, False, value & 0xF == 0, None, cpu=cpu)
+        set_flags(value == 0, True, (value & 0xF) == 0xF, None, cpu=cpu)
 
 
 def exec_di(instr: Instruction, info: ExecuteInfo, cpu: 'CPU'):
@@ -190,7 +189,8 @@ def exec_inc(instr: Instruction, info: ExecuteInfo, cpu: 'CPU'):
         write_register(reg_type=instr.reg_1, value=value, cpu=cpu)
         value = read_register(reg_type=instr.reg_1, cpu=cpu)
     if instr.opcode & 0x3 != 0x3:  # Not INC BC/DE/HL/SP
-        set_flags(value == 0, False, value & 0xF == 0, None, cpu=cpu)
+        z_flag = (value & 0xFF) == 0
+        set_flags(z_flag, False, (value & 0xF) == 0, None, cpu=cpu)
 
 
 def exec_jp(instr: Instruction, info: ExecuteInfo, cpu: 'CPU'):
@@ -213,6 +213,7 @@ def exec_ld(instr: Instruction, info: ExecuteInfo, cpu: 'CPU'):
             cpu.write16(address=info.address, value=info.data)
         else:
             cpu.write(address=info.address, value=info.data)
+        cpu.emulate(1)
         return
     if instr.addr_mode == AddrMode.HL_SPR:
         sp = read_register(instr.reg_2, cpu)
@@ -221,13 +222,13 @@ def exec_ld(instr: Instruction, info: ExecuteInfo, cpu: 'CPU'):
         flag_h = ((sp & 0xF) + (e8 & 0xF)) >= 0x10
         flag_c = ((sp & 0xFF) + (e8 & 0xFF)) >= 0x100
         set_flags(False, False, flag_h, flag_c, cpu)
-        return
     write_register(instr.reg_1, info.data, cpu)
 
 
 def exec_ldh(instr: Instruction, info: ExecuteInfo, cpu: 'CPU'):
     if instr.reg_1 == RegType.A:
-        data = 0xFF00 | info.data
+        address = 0xFF00 | info.data
+        data = cpu.read(address=address)
         cpu.reg_a = data
     else:
         cpu.write(address=info.address, value=cpu.reg_a)
@@ -318,10 +319,10 @@ def exec_rst(instr: Instruction, info: ExecuteInfo, cpu: 'CPU'):
 
 def exec_sbc(instr: Instruction, info: ExecuteInfo, cpu: 'CPU'):
     r1 = read_register(instr.reg_1, cpu=cpu)
-    value = r1 - info.data - cpu.flag_c
+    value = (r1 - info.data - cpu.flag_c) % 0x100
     flag_z = value == 0
     flag_h = (r1 & 0xF) - (info.data & 0xF) - cpu.flag_c < 0
-    flag_c = value < 0
+    flag_c = r1 - info.data - cpu.flag_c < 0
     write_register(instr.reg_1, value, cpu)
     set_flags(flag_z, True, flag_h, flag_c, cpu=cpu)
 
@@ -337,10 +338,10 @@ def exec_stop(instr: Instruction, info: ExecuteInfo, cpu: 'CPU'):
 
 def exec_sub(instr: Instruction, info: ExecuteInfo, cpu: 'CPU'):
     r1 = read_register(instr.reg_1, cpu=cpu)
-    value = r1 - info.data
+    value = (r1 - info.data) % 0x100
     flag_z = value == 0
-    flag_h = (r1 & 0xF) < (info.data & 0xF)
-    flag_c = r1 < info.data
+    flag_h = (r1 & 0xF) - (info.data & 0xF) < 0
+    flag_c = r1 - info.data < 0
     write_register(instr.reg_1, value, cpu)
     set_flags(flag_z, True, flag_h, flag_c, cpu=cpu)
 

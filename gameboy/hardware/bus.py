@@ -31,6 +31,7 @@ class Bus:
         self.motherboard = motherboard
         self.cartridge = motherboard.cartridge
         self.ram = motherboard.ram
+        self.io = motherboard.io
 
     def read(self, address: int) -> int:
         if 0x0 <= address <= 0x7FFF:  # Cartridge ROM
@@ -42,17 +43,18 @@ class Bus:
         elif 0xC000 <= address <= 0xDFFF:  # Working RAM
             return self.ram.read(address=address)
         elif 0xE000 <= address <= 0xFDFF:  # Echo RAM
-            pass
+            return 0
         elif 0xFE00 <= address <= 0xFE9F:  # OAM
             pass
         elif 0xFEA0 <= address <= 0xFEFF:  # Reserved
             pass
         elif 0xFF00 <= address <= 0xFF7F:  # I/O Ports
-            pass
+            return self.io.read(address=address)
         elif 0xFF80 <= address <= 0xFFFE:  # Zero Page / High RAM
             return self.ram.read(address=address)
         elif address == 0xFFFF:  # CPU Interrupt Enable Register
             return self.motherboard.cpu.int_enable_register
+        return 0
         raise UnexpectedFallThrough(f'{address:04X}')
 
     def write(self, address: int, value: int) -> None:
@@ -71,10 +73,11 @@ class Bus:
         elif 0xFEA0 <= address <= 0xFEFF:  # Reserved
             pass
         elif 0xFF00 <= address <= 0xFF7F:  # I/O Ports
-            return  # TODO
+            return self.io.write(address=address, value=value)
         elif 0xFF80 <= address <= 0xFFFE:  # Zero Page / High RAM
             return self.ram.write(address=address, value=value)
         elif address == 0xFFFF:  # CPU Interrupt Enable Register
             self.motherboard.cpu.int_enable_register = value
             return
+        return
         raise UnexpectedFallThrough(f'{address:04X}: {value}')

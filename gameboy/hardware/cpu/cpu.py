@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any
 from gameboy.common import (
     concat, get_bit, get_hi, get_lo, get_logger, set_bit, set_hi, set_lo,
 )
+from gameboy.core import InterruptType
 from gameboy.hardware.cpu.execute import execute
 from gameboy.hardware.cpu.util import fetch_info, fetch_instruction
 
@@ -16,21 +17,24 @@ logger = get_logger(file=__file__)
 class CPU:
 
     def __init__(self, motherboard: 'Motherboard'):
-        self.af = 0
-        self.bc = 0
-        self.de = 0
-        self.hl = 0
-        self.sp = 0
+        # we skip boot loader at this point
+        self.af = 0x01B0
+        self.bc = 0x0013
+        self.de = 0x00D8
+        self.hl = 0x014D
+        self.sp = 0xFEFF
         self.pc = 0x100
 
         self.motherboard = motherboard
         self.bus = motherboard.bus
+        self.timer = motherboard.timer
 
         self.halted: bool = False
         self.int_master_enabled: bool = False
         self.int_enable_register: int = 0
         self.int_flags_register: int = 0
         self.enabling_ime: bool = False
+        self.timer.div = 0xABCC
 
     def tick(self):
         if not self.halted:
@@ -40,6 +44,7 @@ class CPU:
             hi = self.read(self.reg_pc + 2)
             instr = fetch_instruction(cpu=self)
             self.emulate(1)
+            info = fetch_info(instr=instr, cpu=self)
             logger.debug(
                 f'{self.motherboard.ticks:08X} - '
                 f'{pc:04X}: {str(instr):4s} '
@@ -51,7 +56,7 @@ class CPU:
                 f'A: {self.reg_a:02X} BC: {self.reg_bc:04X} '
                 f'DE: {self.reg_de:04X} HL: {self.reg_hl:04X}',
             )
-            info = fetch_info(instr=instr, cpu=self)
+            self.debug()
             execute(instr=instr, info=info, cpu=self)
         else:  # halted
             self.emulate(1)
@@ -63,8 +68,43 @@ class CPU:
         if self.enabling_ime:
             self.int_master_enabled = True
 
+    def handle_interrupt(self, address: int, int_type: InterruptType):
+        if self.int_flags_register & int_type.value:
+            # Jump to interrupt handler
+            self.push16(self.reg_pc)
+            self.reg_pc = address
+            # Set flags
+            self.int_flags_register &= ~int_type.value
+            self.halted = False
+            self.int_master_enabled = False
+            return True
+        return False
+
     def handle_interrupts(self):
-        pass
+        if self.handle_interrupt(0x40, InterruptType.VBLANK):
+            return
+        elif self.handle_interrupt(0x48, InterruptType.LCD_STAT):
+            return
+        elif self.handle_interrupt(0x50, InterruptType.TIMER):
+            return
+        elif self.handle_interrupt(0x58, InterruptType.SERIAL):
+            return
+        elif self.handle_interrupt(0x60, InterruptType.JOYPAD):
+            return
+
+    def request_interrupt(self, int_type: InterruptType):
+        self.int_flags_register |= int_type.value
+
+    def debug(self) -> None:
+        '''
+        This is a temporarily added method for debugging.
+        TODO: Re-implement this as a plugin.
+        '''
+        if self.read(address=0xFF02) == 0x81:
+            with open('debug.log', 'a') as f:
+                c = self.read(address=0xFF01)
+                f.write(chr(c))
+                self.write(address=0xFF02, value=0)
 
     def emulate(self, cycles: int) -> None:
         return self.motherboard.emulate(cycles=cycles)
@@ -81,8 +121,8 @@ class CPU:
         return self.bus.write(address=address, value=value)
 
     def write16(self, address: int, value: int) -> None:
-        self.write(address=address, value=get_hi(value))
-        self.write(address=address + 1, value=get_lo(value))
+        self.write(address=address, value=get_lo(value))
+        self.write(address=address + 1, value=get_hi(value))
 
     def pop(self) -> int:
         value = self.read(self.reg_sp)
@@ -104,59 +144,59 @@ class CPU:
 
     @property
     def reg_a(self):
-        return get_hi(self.af)
+        return get_hi(self.reg_af)
 
     @reg_a.setter
     def reg_a(self, new_value: int):
-        self.af = set_hi(hi=new_value, value=self.af)
+        self.reg_af = set_hi(hi=new_value, value=self.reg_af)
 
     @property
     def reg_b(self):
-        return get_hi(self.bc)
+        return get_hi(self.reg_bc)
 
     @reg_b.setter
     def reg_b(self, new_value: int):
-        self.bc = set_hi(hi=new_value, value=self.bc)
+        self.reg_bc = set_hi(hi=new_value, value=self.reg_bc)
 
     @property
     def reg_c(self):
-        return get_lo(self.bc)
+        return get_lo(self.reg_bc)
 
     @reg_c.setter
     def reg_c(self, new_value: int):
-        self.bc = set_lo(lo=new_value, value=self.bc)
+        self.reg_bc = set_lo(lo=new_value, value=self.reg_bc)
 
     @property
     def reg_d(self):
-        return get_hi(self.de)
+        return get_hi(self.reg_de)
 
     @reg_d.setter
     def reg_d(self, new_value: int):
-        self.de = set_hi(hi=new_value, value=self.de)
+        self.reg_de = set_hi(hi=new_value, value=self.reg_de)
 
     @property
     def reg_e(self):
-        return get_lo(self.de)
+        return get_lo(self.reg_de)
 
     @reg_e.setter
     def reg_e(self, new_value: int):
-        self.de = set_lo(lo=new_value, value=self.de)
+        self.reg_de = set_lo(lo=new_value, value=self.reg_de)
 
     @property
     def reg_h(self):
-        return get_hi(self.hl)
+        return get_hi(self.reg_hl)
 
     @reg_h.setter
     def reg_h(self, new_value: int):
-        self.hl = set_hi(hi=new_value, value=self.hl)
+        self.reg_hl = set_hi(hi=new_value, value=self.reg_hl)
 
     @property
     def reg_l(self):
-        return get_lo(self.hl)
+        return get_lo(self.reg_hl)
 
     @reg_l.setter
     def reg_l(self, new_value: int):
-        self.hl = set_lo(lo=new_value, value=self.hl)
+        self.reg_hl = set_lo(lo=new_value, value=self.reg_hl)
 
     @property
     def reg_af(self):
@@ -216,7 +256,7 @@ class CPU:
 
     @property
     def flag_n(self):
-        return get_bit(self.af, 7)
+        return get_bit(self.af, 6)
 
     @flag_n.setter
     def flag_n(self, new_value: Any):
@@ -224,7 +264,7 @@ class CPU:
 
     @property
     def flag_h(self):
-        return get_bit(self.af, 7)
+        return get_bit(self.af, 5)
 
     @flag_h.setter
     def flag_h(self, new_value: Any):
@@ -232,7 +272,7 @@ class CPU:
 
     @property
     def flag_c(self):
-        return get_bit(self.af, 7)
+        return get_bit(self.af, 4)
 
     @flag_c.setter
     def flag_c(self, new_value: Any):
