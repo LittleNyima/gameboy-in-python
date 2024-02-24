@@ -1,5 +1,3 @@
-import time
-
 import sdl2
 
 from gameboy.plugin.base import BasePlugin
@@ -31,13 +29,14 @@ class DebuggingTileView(BaseSDL2Window):
         self.rows = 32
         self.tile_size = 8
         self.stride = self.tile_size + 1
-        self.palatte = [0xFFFFFFFF, 0xFFAAAAAA, 0xFF555555, 0xFF000000]
-        self.last_update = time.time()
+        self.palette = [0xFFFFFFFF, 0xFFAAAAAA, 0xFF555555, 0xFF000000]
+        self.last_frame = 0
 
     def after_tick(self):
-        if not self.enabled or time.time() - self.last_update < 1.0:
+        current_frame = self.motherboard.ppu.current_frame
+        if not self.enabled or self.last_frame == current_frame:
             return
-        self.last_update = time.time()
+        self.last_frame = current_frame
         self.clear()
         self.display_tiles()
         return super().after_tick()
@@ -64,7 +63,7 @@ class DebuggingTileView(BaseSDL2Window):
                         sdl2.SDL_FillRect(
                             self.surface,
                             rect,
-                            self.palatte[color],
+                            self.palette[color],
                         )
 
     def clear(self):

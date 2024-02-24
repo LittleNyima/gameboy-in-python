@@ -46,6 +46,7 @@ class IO:
         self.serial = Serial()
         self.dma = DMA(motherboard=motherboard)
         self.motherboard = motherboard
+        self.lcd = motherboard.lcd
         self.timer = motherboard.timer
 
     def read(self, address: int) -> int:
@@ -57,6 +58,12 @@ class IO:
             return self.timer.read(address=address)
         elif address == 0xFF0F:
             return self.motherboard.cpu.int_flags_register
+        elif 0xFF40 <= address <= 0xFF45:
+            return self.lcd.read(address=address)
+        elif address == 0xFF46:  # DMA
+            return 0
+        elif 0xFF47 <= address <= 0xFF4B:
+            return self.lcd.read(address=address)
         return 0
         # raise UnexpectedFallThrough
 
@@ -68,13 +75,15 @@ class IO:
             self.serial.control = value
             return
         elif 0xFF04 <= address <= 0xFF07:
-            self.timer.write(address=address, value=value)
-            return
+            return self.timer.write(address=address, value=value)
         elif address == 0xFF0F:
             self.motherboard.cpu.int_flags_register = value
             return
+        elif 0xFF40 <= address <= 0xFF45:
+            return self.lcd.write(address=address, value=value)
         elif address == 0xFF46:
-            self.dma.write(value=value)
-            return
+            return self.dma.write(value=value)
+        elif 0xFF47 <= address <= 0xFF4B:
+            return self.lcd.write(address=address, value=value)
         return
         # raise UnexpectedFallThrough(f'{address:04X}: {value:02X}')

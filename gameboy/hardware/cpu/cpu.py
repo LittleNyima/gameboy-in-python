@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from gameboy.common import (
     concat, get_bit, get_hi, get_lo, get_logger, set_bit, set_hi, set_lo,
@@ -239,7 +239,7 @@ class CPU:
         return get_bit(self.af, 7)
 
     @flag_z.setter
-    def flag_z(self, new_value: Any):
+    def flag_z(self, new_value: bool):
         self.af = set_bit(bool(new_value), self.af, 7)
 
     @property
@@ -247,7 +247,7 @@ class CPU:
         return get_bit(self.af, 6)
 
     @flag_n.setter
-    def flag_n(self, new_value: Any):
+    def flag_n(self, new_value: bool):
         self.af = set_bit(bool(new_value), self.af, 6)
 
     @property
@@ -255,7 +255,7 @@ class CPU:
         return get_bit(self.af, 5)
 
     @flag_h.setter
-    def flag_h(self, new_value: Any):
+    def flag_h(self, new_value: bool):
         self.af = set_bit(bool(new_value), self.af, 5)
 
     @property
@@ -263,5 +263,5 @@ class CPU:
         return get_bit(self.af, 4)
 
     @flag_c.setter
-    def flag_c(self, new_value: Any):
+    def flag_c(self, new_value: bool):
         self.af = set_bit(bool(new_value), self.af, 4)
