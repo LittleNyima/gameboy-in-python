@@ -32,12 +32,13 @@ class Bus:
         self.cartridge = motherboard.cartridge
         self.ram = motherboard.ram
         self.io = motherboard.io
+        self.ppu = motherboard.ppu
 
     def read(self, address: int) -> int:
         if 0x0 <= address <= 0x7FFF:  # Cartridge ROM
             return self.cartridge.read(address=address)
         elif 0x8000 <= address <= 0x9FFF:  # Tile Data
-            pass
+            return self.ppu.read(address=address)
         elif 0xA000 <= address <= 0xBFFF:  # Cartridge RAM
             return self.cartridge.read(address=address)
         elif 0xC000 <= address <= 0xDFFF:  # Working RAM
@@ -45,33 +46,36 @@ class Bus:
         elif 0xE000 <= address <= 0xFDFF:  # Echo RAM
             return 0
         elif 0xFE00 <= address <= 0xFE9F:  # OAM
-            pass
+            if self.io.dma.active:
+                return 0xFF
+            return self.ppu.read(address=address)
         elif 0xFEA0 <= address <= 0xFEFF:  # Reserved
-            pass
+            return 0
         elif 0xFF00 <= address <= 0xFF7F:  # I/O Ports
             return self.io.read(address=address)
         elif 0xFF80 <= address <= 0xFFFE:  # Zero Page / High RAM
             return self.ram.read(address=address)
         elif address == 0xFFFF:  # CPU Interrupt Enable Register
             return self.motherboard.cpu.int_enable_register
-        return 0
         raise UnexpectedFallThrough(f'{address:04X}')
 
     def write(self, address: int, value: int) -> None:
         if 0x0 <= address <= 0x7FFF:
             return self.cartridge.write(address=address, value=value)
         elif 0x8000 <= address <= 0x9FFF:  # Tile Data
-            pass
+            return self.ppu.write(address=address, value=value)
         elif 0xA000 <= address <= 0xBFFF:  # Cartridge RAM
             return self.cartridge.write(address=address, value=value)
         elif 0xC000 <= address <= 0xDFFF:  # Working RAM
             return self.ram.write(address=address, value=value)
         elif 0xE000 <= address <= 0xFDFF:  # Echo RAM
-            pass
+            return
         elif 0xFE00 <= address <= 0xFE9F:  # OAM
-            pass
+            if self.io.dma.active:
+                return
+            return self.ppu.write(address=address, value=value)
         elif 0xFEA0 <= address <= 0xFEFF:  # Reserved
-            pass
+            return
         elif 0xFF00 <= address <= 0xFF7F:  # I/O Ports
             return self.io.write(address=address, value=value)
         elif 0xFF80 <= address <= 0xFFFE:  # Zero Page / High RAM
@@ -79,5 +83,4 @@ class Bus:
         elif address == 0xFFFF:  # CPU Interrupt Enable Register
             self.motherboard.cpu.int_enable_register = value
             return
-        return
         raise UnexpectedFallThrough(f'{address:04X}: {value}')

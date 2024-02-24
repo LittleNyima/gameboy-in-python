@@ -56,7 +56,6 @@ class CPU:
                 f'A: {self.reg_a:02X} BC: {self.reg_bc:04X} '
                 f'DE: {self.reg_de:04X} HL: {self.reg_hl:04X}',
             )
-            self.debug()
             execute(instr=instr, info=info, cpu=self)
         else:  # halted
             self.emulate(1)
@@ -94,17 +93,6 @@ class CPU:
 
     def request_interrupt(self, int_type: InterruptType):
         self.int_flags_register |= int_type.value
-
-    def debug(self) -> None:
-        '''
-        This is a temporarily added method for debugging.
-        TODO: Re-implement this as a plugin.
-        '''
-        if self.read(address=0xFF02) == 0x81:
-            with open('debug.log', 'a') as f:
-                c = self.read(address=0xFF01)
-                f.write(chr(c))
-                self.write(address=0xFF02, value=0)
 
     def emulate(self, cycles: int) -> None:
         return self.motherboard.emulate(cycles=cycles)

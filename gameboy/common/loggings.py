@@ -12,12 +12,14 @@ class LoggerFactory:
 
     def __init__(self):
         formatter = self.get_formatter(display_time=True)
-        log_level = logging.DEBUG
+        log_level = logging.WARNING
 
         self.stream_handler = logging.StreamHandler()
         self.stream_handler.setFormatter(formatter)
         self.stream_handler.setLevel(log_level)
-        self.file_handler = logging.FileHandler('gameboy.log', mode='w')
+        self.file_handler = logging.FileHandler(
+            'gameboy.log', mode='w', delay=True,
+        )
         self.file_handler.setFormatter(formatter)
         self.file_handler.setLevel(log_level)
 

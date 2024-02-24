@@ -1,6 +1,10 @@
+from typing import TYPE_CHECKING
+
 from gameboy.common import UnexpectedFallThrough, get_hi
 from gameboy.core import InterruptType
-from gameboy.hardware.cpu import CPU
+
+if TYPE_CHECKING:
+    from gameboy.hardware import Motherboard
 
 inc_period = {
     0: 1 << 9,
@@ -12,13 +16,13 @@ inc_period = {
 
 class Timer:
 
-    def __init__(self):
+    def __init__(self, motherboard: 'Motherboard'):
         self.div = 0xAC00
         self.tima = 0
         self.tma = 0
         self.tac = 0
 
-        self.cpu: CPU
+        self.motherboard = motherboard
 
     def tick(self):
         prev_div = self.div
@@ -33,7 +37,7 @@ class Timer:
             self.tima += 1
             if self.tima == 0xFF:
                 self.tima = self.tma
-                self.cpu.request_interrupt(InterruptType.TIMER)
+                self.motherboard.cpu.request_interrupt(InterruptType.TIMER)
 
     def write(self, address: int, value: int):
         if address == 0xFF04:
