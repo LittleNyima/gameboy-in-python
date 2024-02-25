@@ -22,11 +22,11 @@ class DebuggingTileView(BaseSDL2Window):
     def __init__(self, gameboy, title: str, scale: int):
         super().__init__(
             gameboy=gameboy, title=title, x_pos=sdl2.SDL_WINDOWPOS_UNDEFINED,
-            y_pos=sdl2.SDL_WINDOWPOS_UNDEFINED, width=16 * 9, height=32 * 9,
+            y_pos=sdl2.SDL_WINDOWPOS_UNDEFINED, width=16 * 9, height=24 * 9,
             scale=scale,
         )
         self.columns = 16
-        self.rows = 32
+        self.rows = 24
         self.tile_size = 8
         self.stride = self.tile_size + 1
         self.palette = [0xFFFFFFFF, 0xFFAAAAAA, 0xFF555555, 0xFF000000]
@@ -53,18 +53,14 @@ class DebuggingTileView(BaseSDL2Window):
                     for bit in range(7, -1, -1):
                         hi = int(bool(b0 & (1 << bit)))
                         lo = int(bool(b1 & (1 << bit)))
-                        color = (hi << 1) | lo
+                        color = self.palette[(hi << 1) | lo]
                         rect = sdl2.SDL_Rect(
                             x=(col * self.stride + 7 - bit) * self.scale,
                             y=(row * self.stride + y // 2) * self.scale,
                             w=self.scale,
                             h=self.scale,
                         )
-                        sdl2.SDL_FillRect(
-                            self.surface,
-                            rect,
-                            self.palette[color],
-                        )
+                        sdl2.SDL_FillRect(self.surface, rect, color)
 
     def clear(self):
         color = 0xFF333333

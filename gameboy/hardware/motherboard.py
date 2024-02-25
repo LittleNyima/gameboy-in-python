@@ -30,5 +30,5 @@ class Motherboard:
             for _ in range(4):
                 self.ticks += 1
                 self.timer.tick()
+                self.ppu.tick()
             self.io.dma.tick()
-            self.ppu.tick()
