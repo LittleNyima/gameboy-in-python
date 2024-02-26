@@ -53,7 +53,7 @@ class PixelFIFO:
                 if self.ppu.lcd.lcdc_bgw_data_area == 0x8800:
                     self.bgw_fetch_data[0] += 128
             self.state = PixelFIFOState.DATA0
-            self.fetch_x += 8
+            self.fetch_x = (self.fetch_x + 8) & 0xFF
         elif self.state == PixelFIFOState.DATA0:
             self.bgw_fetch_data[1] = self.ppu.motherboard.bus.read(
                 self.ppu.lcd.lcdc_bgw_data_area
@@ -79,7 +79,7 @@ class PixelFIFO:
                         index = (hi << 1) | lo
                         color = self.ppu.lcd.bg_colors[index]
                         self.push(color)
-                        self.fifo_x += 1
+                        self.fifo_x = (self.fifo_x + 1) & 0xFF
                 self.state = PixelFIFOState.TILE
 
     def push_pixel(self):
@@ -88,13 +88,13 @@ class PixelFIFO:
             if self.line_x >= self.ppu.lcd.scroll_x % 8:
                 index = self.pushed_x + self.ppu.lcd.ly * X_RESOLUTION
                 self.ppu.video_buffer[index] = data
-                self.pushed_x += 1
-            self.line_x += 1
+                self.pushed_x = (self.pushed_x + 1) & 0xFF
+            self.line_x = (self.line_x + 1) & 0xFF
 
     def process(self):
-        self.map_y = self.ppu.lcd.ly + self.ppu.lcd.scroll_y
-        self.map_x = self.fetch_x + self.ppu.lcd.scroll_x
-        self.tile_y = (self.ppu.lcd.ly + self.ppu.lcd.scroll_y) % 8 * 2
+        self.map_y = (self.ppu.lcd.ly + self.ppu.lcd.scroll_y) & 0xFF
+        self.map_x = (self.fetch_x + self.ppu.lcd.scroll_x) & 0xFF
+        self.tile_y = (self.map_y % 8 * 2) & 0xFF
         if self.ppu.line_ticks % 2 == 0:
             self.fetch()
         self.push_pixel()
@@ -119,7 +119,7 @@ class PPU:
         self.oam = array('B', [0] * 0xA0)
         self.current_frame = 0
         self.line_ticks = 0
-        self.video_buffer = [0] * Y_RESOLUTION * X_RESOLUTION
+        self.video_buffer = array('I', [0] * Y_RESOLUTION * X_RESOLUTION)
 
         self.motherboard = motherboard
         self.lcd = motherboard.lcd
@@ -142,7 +142,7 @@ class PPU:
         self.motherboard.cpu.request_interrupt(int_type)
 
     def newline(self):
-        self.lcd.ly += 1
+        self.lcd.ly = (self.lcd.ly + 1) & 0xFF
         if self.lcd.ly == self.lcd.ly_compare:
             self.lcd.lcds_lyc = True
             if self.lcd.lcds_stat_int(InterruptSource.LYC):

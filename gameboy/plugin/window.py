@@ -1,18 +1,24 @@
 import ctypes
-from typing import List
+import time
+from typing import Dict, List
 
 import sdl2
 import sdl2.ext
 
-from gameboy.core import EventType
+from gameboy.core import Event, EventType
 from gameboy.hardware.ppu import X_RESOLUTION, Y_RESOLUTION
 from gameboy.plugin.base import BasePlugin
 
 sdl2.ext.init()
 
 
-KEY_UP = {
+KEY_UP: Dict[int, EventType] = {
     sdl2.SDLK_ESCAPE: EventType.QUIT,
+}
+
+KEY_DOWN: Dict[int, EventType] = {
+    sdl2.SDLK_j: EventType.MEMORY_VIEW_SCROLL_DOWN,
+    sdl2.SDLK_k: EventType.MEMORY_VIEW_SCROLL_UP,
 }
 
 
@@ -29,20 +35,54 @@ class BaseSDL2Window(BasePlugin):
         self.width = width
         self.height = height
         self.scale = scale
+        self.last_refresh = 0.0
 
         self.window: sdl2.SDL_Window
         self.surface: sdl2.SDL_Surface
 
-    def handle_events(self, event_queue: List[EventType]):
+    def should_refresh(self, frame_rate: float):
+        interval = 1.0 / frame_rate
+        if time.time() - self.last_refresh > interval:
+            self.last_refresh = time.time()
+            return True
+        return False
+
+    def queue_event(
+        self,
+        event_queue: List[Event],
+        event_type: EventType,
+        window_id: int,
+    ):
+        event_queue.append(
+            Event(
+                type=event_type,
+                window_id=window_id,
+            ),
+        )
+
+    def handle_events(self, event_queue: List[Event]):
         if not self.enabled:
             return
         event = sdl2.SDL_Event()
         while sdl2.SDL_PollEvent(ctypes.byref(event)):
+            window_id = event.motion.windowID
             if event.type == sdl2.SDL_QUIT:
-                event_queue.append(EventType.QUIT)
+                self.queue_event(event_queue, EventType.QUIT, window_id)
+            elif event.type == sdl2.SDL_KEYDOWN:
+                key = event.key.keysym.sym
+                event_type = KEY_DOWN.get(key, EventType.IGNORED)
+                self.queue_event(event_queue, event_type, window_id)
             elif event.type == sdl2.SDL_KEYUP:
                 key = event.key.keysym.sym
-                event_queue.append(KEY_UP.get(key, EventType.IGNORED))
+                event_type = KEY_UP.get(key, EventType.IGNORED)
+                self.queue_event(event_queue, event_type, window_id)
+            elif event.type == sdl2.SDL_MOUSEWHEEL:
+                if event.wheel.y < 0:
+                    e = Event(EventType.MEMORY_VIEW_SCROLL_DOWN, window_id)
+                    event_queue.extend([e] * -event.wheel.y)
+                else:
+                    e = Event(EventType.MEMORY_VIEW_SCROLL_UP, window_id)
+                    event_queue.extend([e] * event.wheel.y)
 
     def after_tick(self):
         if not self.enabled:

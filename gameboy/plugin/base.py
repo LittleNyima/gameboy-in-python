@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, List
 
-from gameboy.core import EventType
+from gameboy.core import Event
 
 if TYPE_CHECKING:
     from gameboy import GameBoy
@@ -19,7 +19,7 @@ class BasePlugin:
     def disable(self):
         self.enabled = False
 
-    def handle_events(self, event_queue: List[EventType]):
+    def handle_events(self, event_queue: List[Event]):
         pass
 
     def after_tick(self):

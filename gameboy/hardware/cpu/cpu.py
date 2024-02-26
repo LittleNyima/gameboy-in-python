@@ -68,7 +68,10 @@ class CPU:
             self.int_master_enabled = True
 
     def handle_interrupt(self, address: int, int_type: InterruptType):
-        if self.int_flags_register & int_type.value:
+        if (
+            self.int_enable_register & int_type.value
+            and self.int_flags_register & int_type.value
+        ):
             # Jump to interrupt handler
             self.push16(self.reg_pc)
             self.reg_pc = address

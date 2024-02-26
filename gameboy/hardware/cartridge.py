@@ -29,10 +29,12 @@ class Cartridge:
         logger.info(f'checksum : 0x{self.data[0x14D]:X} ({self.checksum})')
 
     def read(self, address: int) -> int:
-        return self.data[address]
+        if 0x0 <= address <= 0x7FFF:
+            return self.data[address]
+        return 0
 
     def write(self, address: int, value: int) -> None:
-        raise NotImplementedError
+        return
 
     def load(self, filename: str) -> array[int]:
         with open(filename, 'rb') as fp:

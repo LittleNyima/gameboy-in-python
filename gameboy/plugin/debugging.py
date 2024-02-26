@@ -1,5 +1,9 @@
+from typing import List
+
 import sdl2
 
+from gameboy.common import create_font_buffer
+from gameboy.core import Event, EventType
 from gameboy.plugin.base import BasePlugin
 from gameboy.plugin.window import BaseSDL2Window
 
@@ -64,4 +68,89 @@ class DebuggingTileView(BaseSDL2Window):
 
     def clear(self):
         color = 0xFF333333
+        sdl2.SDL_FillRect(self.surface, None, color)
+
+
+class DebuggingMemoryView(BaseSDL2Window):
+
+    def __init__(self, gameboy, title: str, scale: int):
+        super().__init__(
+            gameboy=gameboy, title=title, x_pos=sdl2.SDL_WINDOWPOS_UNDEFINED,
+            y_pos=sdl2.SDL_WINDOWPOS_UNDEFINED, width=456, height=432,
+            scale=scale,
+        )
+        # The height 432 is to the same with the tile view window (24 * 9 * 2).
+        # The width 456 is width of 57 characters.
+        self.font_buffer = create_font_buffer()
+        self.base_addr = 0x0
+        # There will be 17 lines, which consist of 1 line for offsets and 16
+        # lines for addresses and values.
+        header = ' ' * 8 + ' '.join([f'{offset:02X}' for offset in range(16)])
+        self.text_buffer = [header] + [''] * 24
+        self.prev_buffer = [''] * 25
+        self.first_frame = True
+
+    def handle_events(self, event_queue: List[Event]):
+        super().handle_events(event_queue)
+        for event in event_queue:
+            if event.type == EventType.MEMORY_VIEW_SCROLL_DOWN:
+                if self.base_addr < 0xFF00:
+                    self.base_addr += 0x100
+            elif event.type == EventType.MEMORY_VIEW_SCROLL_UP:
+                if self.base_addr > 0:
+                    self.base_addr -= 0x100
+
+    def after_tick(self):
+        if not self.enabled or not self.should_refresh(10):
+            return
+        flush = False
+        if self.first_frame:
+            self.clear()
+            flush = True
+            self.first_frame = False
+        self.update_text_buffer()
+        self.render_text_buffer(flush=flush)
+        return super().after_tick()
+
+    def update_text_buffer(self):
+        self.prev_buffer = self.text_buffer[:]
+        for row in range(24):
+            row_base = self.base_addr + row * 16
+            if row_base >= 0x10000:
+                self.text_buffer[row + 1] = ' ' * 55
+                continue
+            self.text_buffer[row + 1] = (
+                f'0x{self.base_addr + row * 16:04X}  '
+                + ' '.join([
+                    f'{self.motherboard.bus.read(row_base + offset):02X}'
+                    for offset in range(16)
+                ])
+            )
+
+    def render_character(self, ch: str, x: int, y: int):
+        code = ord(ch)
+        base = code * 8 * 16
+        for row in range(16):
+            for col in range(8):
+                color = self.font_buffer[base + row * 8 + col]
+                rect = sdl2.SDL_Rect(
+                    x=(x * 8 + col) * self.scale,
+                    y=(y * 16 + row) * self.scale,
+                    w=self.scale,
+                    h=self.scale,
+                )
+                sdl2.SDL_FillRect(self.surface, rect, color)
+
+    def render_text_buffer(self, flush: bool):
+        for row, line in enumerate(self.text_buffer):
+            for col, ch in enumerate(line):
+                if (
+                    flush
+                    or col >= len(self.prev_buffer[row])
+                    or self.prev_buffer[row][col] != ch
+                ):
+                    self.render_character(ch, col + 1, row + 1)
+
+    def clear(self):
+        color = 0xFFFFFFFF
         sdl2.SDL_FillRect(self.surface, None, color)

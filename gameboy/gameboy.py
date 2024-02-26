@@ -1,7 +1,7 @@
 import time
 from typing import List
 
-from gameboy.core import EventType
+from gameboy.core import Event, EventType
 from gameboy.hardware import Motherboard
 from gameboy.plugin import Plugins
 
@@ -16,13 +16,13 @@ class GameBoy:
             gamerom=gamerom,
         )
 
-        self.event_queue: List[EventType] = []
+        self.event_queue: List[Event] = []
         self.plugins = Plugins(gameboy=self)
 
     def handle_events(self):
         self.plugins.handle_events(self.event_queue)
         for event in self.event_queue:
-            if event == EventType.QUIT:
+            if event.type == EventType.QUIT:
                 self.running = False
         self.event_queue.clear()
 
