@@ -13,10 +13,26 @@ sdl2.ext.init()
 
 
 KEY_UP: Dict[int, EventType] = {
+    sdl2.SDLK_UP: EventType.RELEASE_ARROW_UP,
+    sdl2.SDLK_DOWN: EventType.RELEASE_ARROW_DOWN,
+    sdl2.SDLK_LEFT: EventType.RELEASE_ARROW_LEFT,
+    sdl2.SDLK_RIGHT: EventType.RELEASE_ARROW_RIGHT,
+    sdl2.SDLK_a: EventType.RELEASE_BUTTON_A,
+    sdl2.SDLK_s: EventType.RELEASE_BUTTON_B,
+    sdl2.SDLK_RETURN: EventType.RELEASE_BUTTON_START,
+    sdl2.SDLK_BACKSPACE: EventType.RELEASE_BUTTON_SELECT,
     sdl2.SDLK_ESCAPE: EventType.QUIT,
 }
 
 KEY_DOWN: Dict[int, EventType] = {
+    sdl2.SDLK_UP: EventType.PRESS_ARROW_UP,
+    sdl2.SDLK_DOWN: EventType.PRESS_ARROW_DOWN,
+    sdl2.SDLK_LEFT: EventType.PRESS_ARROW_LEFT,
+    sdl2.SDLK_RIGHT: EventType.PRESS_ARROW_RIGHT,
+    sdl2.SDLK_a: EventType.PRESS_BUTTON_A,
+    sdl2.SDLK_s: EventType.PRESS_BUTTON_B,
+    sdl2.SDLK_RETURN: EventType.PRESS_BUTTON_START,
+    sdl2.SDLK_BACKSPACE: EventType.PRESS_BUTTON_SELECT,
     sdl2.SDLK_j: EventType.MEMORY_VIEW_SCROLL_DOWN,
     sdl2.SDLK_k: EventType.MEMORY_VIEW_SCROLL_UP,
 }

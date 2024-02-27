@@ -1,8 +1,85 @@
 # from gameboy.common import UnexpectedFallThrough
 from typing import TYPE_CHECKING
 
+from gameboy.common import set_bit
+from gameboy.core import Event, EventType
+
 if TYPE_CHECKING:
     from gameboy.hardware import Motherboard
+
+
+class Joypad:
+
+    def __init__(self):
+        self.select_button = True
+        self.select_direction = True
+        self.standard = 0xF
+        self.directional = 0xF
+
+    def read(self) -> int:
+        r = 0xFF
+        if self.select_button ^ self.select_direction:
+            if not self.select_button:
+                r &= self.standard
+            if not self.select_direction:
+                r &= self.directional
+        return r
+
+    def write(self, value: int) -> None:
+        self.select_button = bool(value & 0x20)
+        self.select_direction = bool(value & 0x10)
+
+    def handle_event(self, event: Event):
+        '''
+            PRESS_ARROW_UP = auto()
+            PRESS_ARROW_DOWN = auto()
+            PRESS_ARROW_LEFT = auto()
+            PRESS_ARROW_RIGHT = auto()
+            PRESS_BUTTON_A = auto()
+            PRESS_BUTTON_B = auto()
+            PRESS_BUTTON_START = auto()
+            PRESS_BUTTON_SELECT = auto()
+            RELEASE_ARROW_UP = auto()
+            RELEASE_ARROW_DOWN = auto()
+            RELEASE_ARROW_LEFT = auto()
+            RELEASE_ARROW_RIGHT = auto()
+            RELEASE_BUTTON_A = auto()
+            RELEASE_BUTTON_B = auto()
+            RELEASE_BUTTON_START = auto()
+            RELEASE_BUTTON_SELECT = auto()
+        '''
+        if event.type == EventType.PRESS_ARROW_RIGHT:
+            self.directional = set_bit(False, self.directional, 0)
+        elif event.type == EventType.PRESS_ARROW_LEFT:
+            self.directional = set_bit(False, self.directional, 1)
+        elif event.type == EventType.PRESS_ARROW_UP:
+            self.directional = set_bit(False, self.directional, 2)
+        elif event.type == EventType.PRESS_ARROW_DOWN:
+            self.directional = set_bit(False, self.directional, 3)
+        elif event.type == EventType.PRESS_BUTTON_A:
+            self.standard = set_bit(False, self.standard, 0)
+        elif event.type == EventType.PRESS_BUTTON_B:
+            self.standard = set_bit(False, self.standard, 1)
+        elif event.type == EventType.PRESS_BUTTON_SELECT:
+            self.standard = set_bit(False, self.standard, 2)
+        elif event.type == EventType.PRESS_BUTTON_START:
+            self.standard = set_bit(False, self.standard, 3)
+        elif event.type == EventType.RELEASE_ARROW_RIGHT:
+            self.directional = set_bit(True, self.directional, 0)
+        elif event.type == EventType.RELEASE_ARROW_LEFT:
+            self.directional = set_bit(True, self.directional, 1)
+        elif event.type == EventType.RELEASE_ARROW_UP:
+            self.directional = set_bit(True, self.directional, 2)
+        elif event.type == EventType.RELEASE_ARROW_DOWN:
+            self.directional = set_bit(True, self.directional, 3)
+        elif event.type == EventType.RELEASE_BUTTON_A:
+            self.standard = set_bit(True, self.standard, 0)
+        elif event.type == EventType.RELEASE_BUTTON_B:
+            self.standard = set_bit(True, self.standard, 1)
+        elif event.type == EventType.RELEASE_BUTTON_SELECT:
+            self.standard = set_bit(True, self.standard, 2)
+        elif event.type == EventType.RELEASE_BUTTON_START:
+            self.standard = set_bit(True, self.standard, 3)
 
 
 class DMA:
@@ -43,6 +120,7 @@ class Serial:
 class IO:
 
     def __init__(self, motherboard: 'Motherboard'):
+        self.joypad = Joypad()
         self.serial = Serial()
         self.dma = DMA(motherboard=motherboard)
         self.motherboard = motherboard
@@ -50,7 +128,9 @@ class IO:
         self.timer = motherboard.timer
 
     def read(self, address: int) -> int:
-        if address == 0xFF01:
+        if address == 0xFF00:
+            return self.joypad.read()
+        elif address == 0xFF01:
             return self.serial.data
         elif address == 0xFF02:
             return self.serial.control
@@ -68,7 +148,9 @@ class IO:
         # raise UnexpectedFallThrough
 
     def write(self, address: int, value: int) -> None:
-        if address == 0xFF01:
+        if address == 0xFF00:
+            return self.joypad.write(value=value)
+        elif address == 0xFF01:
             self.serial.data = value
             return
         elif address == 0xFF02:
