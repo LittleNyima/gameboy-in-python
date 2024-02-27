@@ -24,10 +24,6 @@ def parse_args() -> argparse.Namespace:
 
 def setup_debugging(enabled: bool, gameboy: GameBoy):
     if enabled:
-        import logging
-
-        from gameboy.common import set_level
-        set_level(logging.DEBUG)
         gameboy.plugins.debugging_serial.enable()
         gameboy.plugins.debugging_tile_view.enable()
         gameboy.plugins.debugging_memory_view.enable()

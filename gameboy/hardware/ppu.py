@@ -3,7 +3,7 @@ from enum import IntEnum, auto
 from queue import Queue
 from typing import TYPE_CHECKING
 
-from gameboy.common import UnexpectedFallThrough
+from gameboy.common import UnexpectedFallThrough, get_bit
 from gameboy.core import InterruptType
 from gameboy.hardware.lcd import InterruptSource, LCDMode
 
@@ -32,18 +32,97 @@ class PixelFIFO:
         self.line_x = 0
         self.pushed_x = 0
         self.fetch_x = 0
-        self.bgw_fetch_data = [0] * 3
-        self.fetch_entry_data = [0] * 6
+        self.bgw_fetch_data = array('B', [0] * 3)
+        self.fetch_entry_data = array('B', [0] * 6)
+        self.oam_fetch_data = array('B', [0] * 4 * 3)
+        self.fetched_oam = 0
         self.map_y = 0
         self.map_x = 0
         self.tile_y = 0
         self.fifo_x = 0
         self.state = PixelFIFOState.TILE
 
-        self.ppu = ppu
+        self.ppu: 'PPU' = ppu
+
+    def fetch_sprite_color(self, bit: int, default_color: int, bg_index: int):
+        color = default_color
+        for index in range(self.fetched_oam):
+            _, x, _, attr = self.oam_fetch_data[index * 4: index * 4 + 4]
+            sprite_x = x + self.ppu.lcd.scroll_x % 8 - 8  # type: ignore
+            if sprite_x + 8 < self.fifo_x:
+                continue
+            offset = self.fifo_x - sprite_x
+            if offset < 0 or offset > 7:
+                continue
+            bit = offset if get_bit(attr, 5) else 7 - offset  # X Flip or not
+            lo = (self.fetch_entry_data[index * 2] >> bit) & 0x1
+            hi = (self.fetch_entry_data[index * 2 + 1] >> bit) & 0x1
+            sprite_index = (hi << 1) | lo
+            bg_priority = get_bit(attr, 7)
+            if not sprite_index:  # Transparent
+                continue
+            if not bg_priority or not bg_index:
+                palette = (
+                    self.ppu.lcd.obj1_colors  # type: ignore
+                    if get_bit(attr, 4) else
+                    self.ppu.lcd.obj0_colors  # type: ignore
+                )
+                color = palette[sprite_index]
+                if sprite_index:
+                    break
+        return color
+
+    def fetch_sprite_tile(self):
+        for index in range(self.ppu.oam_entry_count):
+            y, x, tile, attr = self.ppu.oam_entries[index * 4: index * 4 + 4]
+            sprite_x = x + self.ppu.lcd.scroll_x % 8 - 8
+            if (
+                self.fetch_x <= sprite_x < self.fetch_x + 8
+                or sprite_x < self.fetch_x <= sprite_x + 8
+            ):
+                self.oam_fetch_data[self.fetched_oam * 4 + 0] = y
+                self.oam_fetch_data[self.fetched_oam * 4 + 1] = x
+                self.oam_fetch_data[self.fetched_oam * 4 + 2] = tile
+                self.oam_fetch_data[self.fetched_oam * 4 + 3] = attr
+                self.fetched_oam += 1
+            if self.fetched_oam >= 3:
+                break
+
+    def fetch_sprite_data(self, offset: int):
+        sprite_height = self.ppu.lcd.lcdc_obj_height  # type: ignore
+        for index in range(self.fetched_oam):
+            y, _, tile, attr = self.oam_fetch_data[index * 4: index * 4 + 4]
+            tile_y = ((self.ppu.lcd.ly + 16 - y) * 2) & 0xFF  # type: ignore
+            if get_bit(attr, 6):  # Y Flip or not
+                tile_y = sprite_height * 2 - 2 - tile_y
+            if sprite_height == 16:
+                tile &= 0xFE
+            bus_read = self.ppu.motherboard.bus.read
+            self.fetch_entry_data[index * 2 + offset] = bus_read(
+                0x8000 + tile * 16 + tile_y + offset,
+            )
+
+    def fetch_window_tile(self):
+        if not self.ppu.window_visible():
+            return
+        if (
+            self.fetch_x + 7 >= self.ppu.lcd.window_x
+            and self.fetch_x + 7 < self.ppu.lcd.window_x + Y_RESOLUTION + 14
+            and self.ppu.lcd.ly >= self.ppu.lcd.window_y
+            and self.ppu.lcd.ly < self.ppu.lcd.window_y + X_RESOLUTION
+        ):
+            window_tile_y = self.ppu.window_line // 8
+            self.bgw_fetch_data[0] = self.ppu.motherboard.bus.read(
+                self.ppu.lcd.lcdc_win_map_area
+                + (self.fetch_x + 7 - self.ppu.lcd.window_x) // 8
+                + window_tile_y * 32,
+            )
+            if self.ppu.lcd.lcdc_bgw_data_area == 0x8800:
+                self.bgw_fetch_data[0] = (self.bgw_fetch_data[0] + 0x80) & 0xFF
 
     def fetch(self):
         if self.state == PixelFIFOState.TILE:
+            self.fetched_oam = 0
             if self.ppu.lcd.lcdc_bgw_enable:
                 self.bgw_fetch_data[0] = self.ppu.motherboard.bus.read(
                     self.ppu.lcd.lcdc_bg_map_area
@@ -51,7 +130,12 @@ class PixelFIFO:
                     + self.map_y // 8 * 32,
                 )
                 if self.ppu.lcd.lcdc_bgw_data_area == 0x8800:
-                    self.bgw_fetch_data[0] += 128
+                    self.bgw_fetch_data[0] = (
+                        self.bgw_fetch_data[0] + 0x80
+                    ) & 0xFF
+                self.fetch_window_tile()
+            if self.ppu.lcd.lcdc_obj_enable and self.ppu.oam_entry_count:
+                self.fetch_sprite_tile()
             self.state = PixelFIFOState.DATA0
             self.fetch_x = (self.fetch_x + 8) & 0xFF
         elif self.state == PixelFIFOState.DATA0:
@@ -60,6 +144,7 @@ class PixelFIFO:
                 + self.bgw_fetch_data[0] * 16
                 + self.tile_y,
             )
+            self.fetch_sprite_data(0)
             self.state = PixelFIFOState.DATA1
         elif self.state == PixelFIFOState.DATA1:
             self.bgw_fetch_data[2] = self.ppu.motherboard.bus.read(
@@ -67,6 +152,7 @@ class PixelFIFO:
                 + self.bgw_fetch_data[0] * 16
                 + self.tile_y + 1,
             )
+            self.fetch_sprite_data(1)
             self.state = PixelFIFOState.IDLE
         elif self.state == PixelFIFOState.IDLE:
             self.state = PixelFIFOState.PUSH
@@ -78,6 +164,10 @@ class PixelFIFO:
                         hi = (self.bgw_fetch_data[2] >> bit) & 1
                         index = (hi << 1) | lo
                         color = self.ppu.lcd.bg_colors[index]
+                        if not self.ppu.lcd.lcdc_bgw_enable:
+                            color = self.ppu.lcd.bg_colors[0]
+                        if self.ppu.lcd.lcdc_obj_enable:
+                            color = self.fetch_sprite_color(bit, color, index)
                         self.push(color)
                         self.fifo_x = (self.fifo_x + 1) & 0xFF
                 self.state = PixelFIFOState.TILE
@@ -117,8 +207,11 @@ class PPU:
     def __init__(self, motherboard: 'Motherboard'):
         self.vram = array('B', [0] * 0x2000)
         self.oam = array('B', [0] * 0xA0)
+        self.oam_entries = array('B', [0] * 4 * 10)
+        self.oam_entry_count = 0
         self.current_frame = 0
         self.line_ticks = 0
+        self.window_line = 0
         self.video_buffer = array('I', [0] * Y_RESOLUTION * X_RESOLUTION)
 
         self.motherboard = motherboard
@@ -142,6 +235,12 @@ class PPU:
         self.motherboard.cpu.request_interrupt(int_type)
 
     def newline(self):
+        if (
+            self.window_visible()
+            and self.lcd.ly >= self.lcd.window_y
+            and self.lcd.ly < self.lcd.window_y + Y_RESOLUTION
+        ):
+            self.window_line = (self.window_line + 1) & 0xFF
         self.lcd.ly = (self.lcd.ly + 1) & 0xFF
         if self.lcd.ly == self.lcd.ly_compare:
             self.lcd.lcds_lyc = True
@@ -149,6 +248,38 @@ class PPU:
                 self.request_interrupt(InterruptType.LCD_STAT)
         else:
             self.lcd.lcds_lyc = False
+
+    def window_visible(self):
+        return (
+            self.lcd.lcdc_win_enable
+            and 0 <= self.lcd.window_x <= 166
+            and 0 <= self.lcd.window_y < Y_RESOLUTION
+        )
+
+    def load_sprites(self):
+        ly = self.lcd.ly
+        sprite_height = self.lcd.lcdc_obj_height
+        for index in range(40):
+            y, x, tile, attr = self.oam[index * 4:index * 4 + 4]
+            if not x:  # Not visible sprite
+                continue
+            if self.oam_entry_count >= 10:  # 10 sprites per line at most
+                break
+            if y <= ly + 16 and y + sprite_height > ly + 16:
+                self.oam_entries[self.oam_entry_count * 4 + 0] = y
+                self.oam_entries[self.oam_entry_count * 4 + 1] = x
+                self.oam_entries[self.oam_entry_count * 4 + 2] = tile
+                self.oam_entries[self.oam_entry_count * 4 + 3] = attr
+                self.oam_entry_count += 1
+        # sort the entries according to x ascent
+        entries = list(range(self.oam_entry_count))
+        entries.sort(key=lambda idx: self.oam_entries[idx * 4 + 1])
+        new_entries = array('B', [0] * 4 * self.oam_entry_count)
+        for new_index, old_index in enumerate(entries):
+            new_entries[new_index * 4: new_index * 4 + 4] = self.oam_entries[
+                old_index * 4: old_index * 4 + 4
+            ]
+        self.oam_entries[:self.oam_entry_count * 4] = new_entries
 
     def tick_hblank(self):
         if self.line_ticks >= TICKS_PER_LINE:
@@ -169,6 +300,7 @@ class PPU:
             if self.lcd.ly >= LINES_PER_FRAME:
                 self.lcd.lcds_mode = LCDMode.OAM_SCAN
                 self.lcd.ly = 0
+                self.window_line = 0
             self.line_ticks = 0
 
     def tick_oam_scan(self):
@@ -179,6 +311,9 @@ class PPU:
             self.pixel_fifo.fetch_x = 0
             self.pixel_fifo.pushed_x = 0
             self.pixel_fifo.fifo_x = 0
+        if self.line_ticks == 1:
+            self.oam_entry_count = 0
+            self.load_sprites()
 
     def tick_transferring(self):
         self.pixel_fifo.process()
