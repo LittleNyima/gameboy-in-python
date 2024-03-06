@@ -11,7 +11,6 @@ from gameboy.plugin.base import BasePlugin
 
 sdl2.ext.init()
 
-
 KEY_UP: Dict[int, EventType] = {
     sdl2.SDLK_UP: EventType.RELEASE_ARROW_UP,
     sdl2.SDLK_DOWN: EventType.RELEASE_ARROW_DOWN,

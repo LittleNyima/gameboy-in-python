@@ -36,6 +36,13 @@ class DebuggingTileView(BaseSDL2Window):
         self.palette = [0xFFFFFFFF, 0xFFAAAAAA, 0xFF555555, 0xFF000000]
         self.last_frame = 0
 
+    # def handle_events(self, event_queue: List[Event]):
+    #     """
+    #     This empty method is to override the default event handling function,
+    #     which is time-cosuming.
+    #     """
+    #     pass
+
     def after_tick(self):
         current_frame = self.motherboard.ppu.current_frame
         if not self.enabled or self.last_frame == current_frame:
@@ -47,6 +54,7 @@ class DebuggingTileView(BaseSDL2Window):
 
     def display_tiles(self):
         base_addr = 0x8000
+        rect = sdl2.SDL_Rect()
         for row in range(self.rows):
             for col in range(self.columns):
                 tile_idx = row * self.columns + col
@@ -58,12 +66,10 @@ class DebuggingTileView(BaseSDL2Window):
                         hi = int(bool(b0 & (1 << bit)))
                         lo = int(bool(b1 & (1 << bit)))
                         color = self.palette[(hi << 1) | lo]
-                        rect = sdl2.SDL_Rect(
-                            x=(col * self.stride + 7 - bit) * self.scale,
-                            y=(row * self.stride + y // 2) * self.scale,
-                            w=self.scale,
-                            h=self.scale,
-                        )
+                        rect.x = (col * self.stride + 7 - bit) * self.scale
+                        rect.y = (row * self.stride + y // 2) * self.scale
+                        rect.w = self.scale
+                        rect.h = self.scale
                         sdl2.SDL_FillRect(self.surface, rect, color)
 
     def clear(self):
@@ -91,7 +97,6 @@ class DebuggingMemoryView(BaseSDL2Window):
         self.first_frame = True
 
     def handle_events(self, event_queue: List[Event]):
-        super().handle_events(event_queue)
         for event in event_queue:
             if event.type == EventType.MEMORY_VIEW_SCROLL_DOWN:
                 if self.base_addr < 0xFF00:
@@ -130,15 +135,14 @@ class DebuggingMemoryView(BaseSDL2Window):
     def render_character(self, ch: str, x: int, y: int):
         code = ord(ch)
         base = code * 8 * 16
+        rect = sdl2.SDL_Rect()
         for row in range(16):
             for col in range(8):
                 color = self.font_buffer[base + row * 8 + col]
-                rect = sdl2.SDL_Rect(
-                    x=(x * 8 + col) * self.scale,
-                    y=(y * 16 + row) * self.scale,
-                    w=self.scale,
-                    h=self.scale,
-                )
+                rect.x = (x * 8 + col) * self.scale
+                rect.y = (y * 16 + row) * self.scale
+                rect.w = self.scale
+                rect.h = self.scale
                 sdl2.SDL_FillRect(self.surface, rect, color)
 
     def render_text_buffer(self, flush: bool):

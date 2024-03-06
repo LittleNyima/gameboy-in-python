@@ -17,16 +17,16 @@ inc_period = {
 class Timer:
 
     def __init__(self, motherboard: 'Motherboard'):
-        self._div = 0xAC00
-        self._tima = 0
-        self._tma = 0
-        self._tac = 0
+        self.div = 0xAC00
+        self.tima = 0
+        self.tma = 0
+        self.tac = 0
 
         self.motherboard = motherboard
 
     def tick(self):
         prev_div = self.div
-        self.div += 1
+        self.div = (self.div + 1) & 0xFFFF
         # determine whether to update according to increment cycles
         clock_select = self.tac & 0b11
         period = inc_period[clock_select]
@@ -64,35 +64,3 @@ class Timer:
         elif address == 0xFF07:
             return self.tac
         raise UnexpectedFallThrough
-
-    @property
-    def div(self):
-        return self._div
-
-    @div.setter
-    def div(self, new_value: int):
-        self._div = new_value & 0xFFFF
-
-    @property
-    def tima(self):
-        return self._tima
-
-    @tima.setter
-    def tima(self, new_value: int):
-        self._tima = new_value & 0xFF
-
-    @property
-    def tma(self):
-        return self._tma
-
-    @tma.setter
-    def tma(self, new_value: int):
-        self._tma = new_value & 0xFF
-
-    @property
-    def tac(self):
-        return self._tac
-
-    @tac.setter
-    def tac(self, new_value: int):
-        self._tac = new_value & 0xFF

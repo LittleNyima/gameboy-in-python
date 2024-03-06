@@ -38,24 +38,9 @@ class CPU:
 
     def tick(self):
         if not self.halted:
-            opcode = self.read(self.reg_pc)
-            pc = self.reg_pc
-            lo = self.read(self.reg_pc + 1)
-            hi = self.read(self.reg_pc + 2)
             instr = fetch_instruction(cpu=self)
             self.emulate(1)
             info = fetch_info(instr=instr, cpu=self)
-            logger.debug(
-                f'{self.motherboard.ticks:08X} - '
-                f'{pc:04X}: {str(instr):4s} '
-                f'({opcode=:02X}, {lo=:02X}, {hi=:02X}) '
-                f'{"Z" if self.flag_z else "-"}'
-                f'{"N" if self.flag_n else "-"}'
-                f'{"H" if self.flag_h else "-"}'
-                f'{"C" if self.flag_c else "-"} '
-                f'A: {self.reg_a:02X} BC: {self.reg_bc:04X} '
-                f'DE: {self.reg_de:04X} HL: {self.reg_hl:04X}',
-            )
             execute(instr=instr, info=info, cpu=self)
         else:  # halted
             self.emulate(1)

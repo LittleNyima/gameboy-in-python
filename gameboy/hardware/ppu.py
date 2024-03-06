@@ -1,6 +1,6 @@
 from array import array
+from collections import deque
 from enum import IntEnum, auto
-from queue import Queue
 from typing import TYPE_CHECKING
 
 from gameboy.common import UnexpectedFallThrough, get_bit
@@ -27,7 +27,7 @@ class PixelFIFOState(IntEnum):
 
 class PixelFIFO:
     def __init__(self, ppu: 'PPU'):
-        self.fifo: Queue[int] = Queue()
+        self.fifo: deque[int] = deque()
         self.size = 0
         self.line_x = 0
         self.pushed_x = 0
@@ -194,12 +194,12 @@ class PixelFIFO:
             _ = self.pull()
 
     def push(self, value: int):
-        self.fifo.put(value, block=False)
+        self.fifo.append(value)
         self.size += 1
 
     def pull(self) -> int:
         self.size -= 1
-        return self.fifo.get(block=False)
+        return self.fifo.popleft()
 
 
 class PPU:
@@ -221,13 +221,14 @@ class PPU:
 
     def tick(self):
         self.line_ticks += 1
-        if self.lcd.lcds_mode == LCDMode.HBLANK:
+        lcds_mode = self.lcd.lcds_mode
+        if lcds_mode == LCDMode.HBLANK:
             return self.tick_hblank()
-        elif self.lcd.lcds_mode == LCDMode.VBLANK:
+        elif lcds_mode == LCDMode.VBLANK:
             return self.tick_vblank()
-        elif self.lcd.lcds_mode == LCDMode.OAM_SCAN:
+        elif lcds_mode == LCDMode.OAM_SCAN:
             return self.tick_oam_scan()
-        elif self.lcd.lcds_mode == LCDMode.TRANSFERRING:
+        elif lcds_mode == LCDMode.TRANSFERRING:
             return self.tick_transferring()
         raise UnexpectedFallThrough
 

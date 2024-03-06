@@ -40,3 +40,19 @@ def main():
 
 
 main()
+
+
+# def profile_main():
+#     args = parse_args()
+#     with GameBoy(
+#         gamerom=args.gamerom,
+#     ) as gameboy:
+#         setup_debugging(enabled=args.debug, gameboy=gameboy)
+#         while gameboy.tick():
+#             if gameboy.ticks >= 0xAAAAAA:
+#                 print(gameboy.motherboard.ppu.current_frame)
+#                 break
+
+
+# import cProfile
+# cProfile.run('profile_main()', sort='tottime')

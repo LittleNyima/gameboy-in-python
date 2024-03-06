@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING, List
 
 from gameboy.core import Event
 
-from .base import BasePlugin
 from .debugging import DebuggingMemoryView, DebuggingSerial, DebuggingTileView
 from .window import GameSDL2Window
 
@@ -26,14 +25,24 @@ class Plugins:
         self.game_view.enable()
 
     def handle_events(self, event_queue: List[Event]):
-        for attr in self.__dict__.values():
-            if isinstance(attr, BasePlugin) and attr.enabled:
-                attr.handle_events(event_queue=event_queue)
+        if self.debugging_serial.enabled:
+            self.debugging_serial.handle_events(event_queue)
+        if self.debugging_tile_view.enabled:
+            self.debugging_tile_view.handle_events(event_queue)
+        if self.debugging_memory_view.enabled:
+            self.debugging_memory_view.handle_events(event_queue)
+        if self.game_view.enabled:
+            self.game_view.handle_events(event_queue)
 
     def after_tick(self):
-        for attr in self.__dict__.values():
-            if isinstance(attr, BasePlugin) and attr.enabled:
-                attr.after_tick()
+        if self.debugging_serial.enabled:
+            self.debugging_serial.after_tick()
+        if self.debugging_tile_view.enabled:
+            self.debugging_tile_view.after_tick()
+        if self.debugging_memory_view.enabled:
+            self.debugging_memory_view.after_tick()
+        if self.game_view.enabled:
+            self.game_view.after_tick()
 
 
 __all__ = ['Plugins']

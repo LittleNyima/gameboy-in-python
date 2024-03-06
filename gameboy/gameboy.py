@@ -1,7 +1,7 @@
 import time
 from typing import List
 
-from gameboy.core import Event, EventType
+from gameboy.core import JOYPAD_EVENTS, Event, EventType
 from gameboy.hardware import Motherboard
 from gameboy.plugin import Plugins
 
@@ -24,24 +24,7 @@ class GameBoy:
         for event in self.event_queue:
             if event.type == EventType.QUIT:
                 self.running = False
-            elif event.type in {
-                EventType.PRESS_ARROW_UP,
-                EventType.PRESS_ARROW_DOWN,
-                EventType.PRESS_ARROW_RIGHT,
-                EventType.PRESS_ARROW_LEFT,
-                EventType.PRESS_BUTTON_A,
-                EventType.PRESS_BUTTON_B,
-                EventType.PRESS_BUTTON_START,
-                EventType.PRESS_BUTTON_SELECT,
-                EventType.RELEASE_ARROW_UP,
-                EventType.RELEASE_ARROW_DOWN,
-                EventType.RELEASE_ARROW_RIGHT,
-                EventType.RELEASE_ARROW_LEFT,
-                EventType.RELEASE_BUTTON_A,
-                EventType.RELEASE_BUTTON_B,
-                EventType.RELEASE_BUTTON_START,
-                EventType.RELEASE_BUTTON_SELECT,
-            }:
+            elif event.type in JOYPAD_EVENTS:
                 self.motherboard.io.joypad.handle_event(event)
         self.event_queue.clear()
 

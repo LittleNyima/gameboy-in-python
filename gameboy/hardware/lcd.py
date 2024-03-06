@@ -10,9 +10,17 @@ class LCDMode(IntEnum):
     OAM_SCAN = 2
     TRANSFERRING = 3
 
-    @staticmethod
-    def from_int(value: int) -> 'LCDMode':
-        return LCDMode(value=value)
+
+"""
+Instantiating enum object from value is time consuming, so we prepare a lookup
+table here for optimization.
+"""
+LCD_MODE_LOOKUP = [
+    LCDMode.HBLANK,
+    LCDMode.VBLANK,
+    LCDMode.OAM_SCAN,
+    LCDMode.TRANSFERRING,
+]
 
 
 class InterruptSource(IntFlag):
@@ -146,7 +154,7 @@ class LCD:
 
     @property
     def lcds_mode(self):
-        return LCDMode.from_int(self.lcd_status & 0x3)
+        return LCD_MODE_LOOKUP[self.lcd_status & 0x3]
 
     @lcds_mode.setter
     def lcds_mode(self, mode: LCDMode):
